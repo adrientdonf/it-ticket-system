@@ -3,6 +3,7 @@ import TicketCard from './components/TicketCard';
 import TicketModal from './components/TicketModal';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ProfilePage from './pages/ProfilePage';
 import { getTickets, createTicket, updateTicket, deleteTicket } from './services/api';
 import './App.css';
 
@@ -19,13 +20,18 @@ function App() {
   });
 
   // ── Ticket State ────────────────────────────────────────────────────────────
-  const [tickets,        setTickets]       = useState([]);
-  const [loading,        setLoading]       = useState(true);
-  const [error,          setError]         = useState(null);
-  const [modalOpen,      setModalOpen]     = useState(false);
-  const [editingTicket,  setEditingTicket] = useState(null);
-  const [filter,         setFilter]        = useState('all');
-  const [search,         setSearch]        = useState('');
+  const [tickets,       setTickets]       = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState(null);
+  const [modalOpen,     setModalOpen]     = useState(false);
+  const [editingTicket, setEditingTicket] = useState(null);
+  const [filter,        setFilter]        = useState('all');
+  const [search,        setSearch]        = useState('');
+
+  // ── Navigation State ────────────────────────────────────────────────────────
+  // Controls which page is shown: dashboard, register, or profile
+  const [showRegister, setShowRegister] = useState(false);
+  const [showProfile,  setShowProfile]  = useState(false);
 
   // ── Fetch Tickets ───────────────────────────────────────────────────────────
   // Calls GET /api/tickets — the JWT token is attached automatically by api.js
@@ -49,7 +55,7 @@ function App() {
 
   // ── Auth Handlers ───────────────────────────────────────────────────────────
 
-  // Called by LoginPage after a successful login response
+  // Called by LoginPage / RegisterPage after a successful auth response
   const handleLogin = (user) => setCurrentUser(user);
 
   // Clears token + user from localStorage and returns to login screen
@@ -108,25 +114,35 @@ function App() {
   };
 
   // ── Auth Guard ──────────────────────────────────────────────────────────────
-  // If no user is logged in, show the login page instead of the dashboard
-  const [showRegister, setShowRegister] = useState(false);
-
-if (!currentUser) {
-  if (showRegister) {
+  // If no user is logged in, show login or register page
+  if (!currentUser) {
+    if (showRegister) {
+      return (
+        <RegisterPage
+          onLogin={handleLogin}
+          onGoToLogin={() => setShowRegister(false)}
+        />
+      );
+    }
     return (
-      <RegisterPage
+      <LoginPage
         onLogin={handleLogin}
-        onGoToLogin={() => setShowRegister(false)}
+        onGoToRegister={() => setShowRegister(true)}
       />
     );
   }
-  return (
-    <LoginPage
-      onLogin={handleLogin}
-      onGoToRegister={() => setShowRegister(true)}
-    />
-  );
-}
+
+  // ── Profile Page Guard ──────────────────────────────────────────────────────
+  // Show profile page when user clicks their username in the header
+  if (showProfile) {
+    return (
+      <ProfilePage
+        currentUser={currentUser}
+        tickets={tickets}
+        onBack={() => setShowProfile(false)}
+      />
+    );
+  }
 
   // ── Dashboard ───────────────────────────────────────────────────────────────
   return (
@@ -145,9 +161,16 @@ if (!currentUser) {
             </div>
           </div>
 
-          {/* Right: username, logout, new ticket */}
+          {/* Right: username (clickable → profile), logout, new ticket */}
           <div className="header__right">
-            <span className="header__user">👤 {currentUser.username}</span>
+            <span
+              className="header__user"
+              onClick={() => setShowProfile(true)}
+              style={{ cursor: 'pointer' }}
+              title="View profile"
+            >
+              👤 {currentUser.username}
+            </span>
             <button className="btn btn--ghost btn--sm" onClick={handleLogout}>
               Log out
             </button>
@@ -219,15 +242,15 @@ if (!currentUser) {
         {/* Ticket grid */}
         {!loading && !error && filtered.length > 0 && (
           <div className="ticket-grid">
-           {filtered.map((ticket) => (
-  <TicketCard
-    key={ticket.id}
-    ticket={ticket}
-    onEdit={openEdit}
-    onDelete={handleDelete}
-    currentUser={currentUser}
-  />
-))}
+            {filtered.map((ticket) => (
+              <TicketCard
+                key={ticket.id}
+                ticket={ticket}
+                onEdit={openEdit}
+                onDelete={handleDelete}
+                currentUser={currentUser}
+              />
+            ))}
           </div>
         )}
 
