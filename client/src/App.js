@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import TicketCard from './components/TicketCard';
 import TicketModal from './components/TicketModal';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import { getTickets, createTicket, updateTicket, deleteTicket } from './services/api';
 import './App.css';
 
@@ -108,9 +109,24 @@ function App() {
 
   // ── Auth Guard ──────────────────────────────────────────────────────────────
   // If no user is logged in, show the login page instead of the dashboard
-  if (!currentUser) {
-    return <LoginPage onLogin={handleLogin} onGoToRegister={() => {}} />;
+  const [showRegister, setShowRegister] = useState(false);
+
+if (!currentUser) {
+  if (showRegister) {
+    return (
+      <RegisterPage
+        onLogin={handleLogin}
+        onGoToLogin={() => setShowRegister(false)}
+      />
+    );
   }
+  return (
+    <LoginPage
+      onLogin={handleLogin}
+      onGoToRegister={() => setShowRegister(true)}
+    />
+  );
+}
 
   // ── Dashboard ───────────────────────────────────────────────────────────────
   return (
