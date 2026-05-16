@@ -13,6 +13,15 @@ app.use(express.urlencoded({ extended: true }));
 require('./config/db');
 
 // ── Routes ───────────────────────────────────────────────────────────────
+
+// Authentication routes
+// POST /api/auth/register
+// POST /api/auth/login
+// GET  /api/auth/me
+app.use('/api/auth', require('./routes/authRoutes'));
+
+// Ticket CRUD routes
+// GET, POST, PUT, DELETE /api/tickets
 app.use('/api/tickets', require('./routes/ticketRoutes'));
 
 // ── 404 Handler ──────────────────────────────────────────────────────────────

@@ -1,13 +1,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // ticketRoutes.js
-// Defines all the API endpoints for tickets.
-// Routes receive the HTTP request, validate the data,
-// then pass it to the correct controller function.
+// Defines all API endpoints for tickets.
+// Routes are protected using JWT authentication middleware.
+// Only logged-in users can access ticket operations.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const express = require('express');
-const router  = express.Router();
+const router = express.Router();
 const { body } = require('express-validator');
+
+// JWT AUTH MIDDLEWARE
+const { protect } = require('../middleware/authMiddleware');
+
+// Ticket controller functions
 const {
   createTicket,
   getAllTickets,
@@ -18,39 +23,61 @@ const {
 
 
 // ── Validation rules for creating a ticket ────────────────────────────────────
-// These rules run before the controller — if they fail, we return a 400 error.
+// Runs before controller. If invalid → returns 400 error.
 const ticketValidation = [
   body('title')
     .trim()
     .notEmpty().withMessage('Title is required')
     .isLength({ max: 255 }).withMessage('Title must be under 255 characters'),
+
   body('description')
     .trim()
     .notEmpty().withMessage('Description is required'),
+
   body('priority')
     .optional()
-    .isIn(['low', 'medium', 'high']).withMessage('Priority must be low, medium, or high'),
-  body('created_by')
-    .trim()
-    .notEmpty().withMessage('created_by is required')
+    .isIn(['low', 'medium', 'high'])
+    .withMessage('Priority must be low, medium, or high')
 ];
 
 
 // ── Validation rules for updating a ticket ────────────────────────────────────
 const updateValidation = [
-  body('title').trim().notEmpty().withMessage('Title is required'),
-  body('description').trim().notEmpty().withMessage('Description is required'),
-  body('priority').isIn(['low', 'medium', 'high']).withMessage('Invalid priority'),
-  body('status').isIn(['open', 'in_progress', 'closed']).withMessage('Invalid status')
+  body('title')
+    .trim()
+    .notEmpty().withMessage('Title is required'),
+
+  body('description')
+    .trim()
+    .notEmpty().withMessage('Description is required'),
+
+  body('priority')
+    .isIn(['low', 'medium', 'high'])
+    .withMessage('Invalid priority'),
+
+  body('status')
+    .isIn(['open', 'in_progress', 'closed'])
+    .withMessage('Invalid status')
 ];
 
 
-// ── API Routes ────────────────────────────────────────────────────────────────
-router.post('/',      ticketValidation,  createTicket);   // Create a ticket
-router.get('/',                          getAllTickets);   // Get all tickets
-router.get('/:id',                       getTicketById);  // Get one ticket
-router.put('/:id',    updateValidation,  updateTicket);   // Update a ticket
-router.delete('/:id',                    deleteTicket);   // Delete a ticket
+// ── PROTECTED API ROUTES (JWT REQUIRED) ──────────────────────────────────────
+// All routes require Authorization: Bearer <token>
+
+// CREATE TICKET
+router.post('/', protect, ticketValidation, createTicket);
+
+// GET ALL TICKETS
+router.get('/', protect, getAllTickets);
+
+// GET SINGLE TICKET
+router.get('/:id', protect, getTicketById);
+
+// UPDATE TICKET
+router.put('/:id', protect, updateValidation, updateTicket);
+
+// DELETE TICKET
+router.delete('/:id', protect, deleteTicket);
 
 
 module.exports = router;
