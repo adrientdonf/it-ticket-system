@@ -219,14 +219,15 @@ if (!currentUser) {
         {/* Ticket grid */}
         {!loading && !error && filtered.length > 0 && (
           <div className="ticket-grid">
-            {filtered.map((ticket) => (
-              <TicketCard
-                key={ticket.id}
-                ticket={ticket}
-                onEdit={openEdit}
-                onDelete={handleDelete}
-              />
-            ))}
+           {filtered.map((ticket) => (
+  <TicketCard
+    key={ticket.id}
+    ticket={ticket}
+    onEdit={openEdit}
+    onDelete={handleDelete}
+    currentUser={currentUser}
+  />
+))}
           </div>
         )}
 
