@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import CommentSection from './CommentSection';
 
 // ── Config Maps ───────────────────────────────────────────────────────────────
 // Maps priority/status values to display labels and colors
@@ -24,6 +25,9 @@ const STATUS_CONFIG = {
 function TicketCard({ ticket, onEdit, onDelete, currentUser }) {
   const priority = PRIORITY_CONFIG[ticket.priority] || PRIORITY_CONFIG.low;
   const status   = STATUS_CONFIG[ticket.status]     || STATUS_CONFIG.open;
+
+  // ── Toggle state for showing/hiding the comment section ────────────────────
+  const [showComments, setShowComments] = useState(false);
 
   // ── Permission Check ────────────────────────────────────────────────────────
   // Admins can do anything.
@@ -65,19 +69,36 @@ function TicketCard({ ticket, onEdit, onDelete, currentUser }) {
           <span>{formatDate(ticket.created_at)}</span>
         </div>
 
-        {/* Only render Edit/Delete if user has permission */}
-        {canModify && (
-          <div className="ticket-card__actions">
-            <button className="btn btn--ghost" onClick={() => onEdit(ticket)}>
-              Edit
-            </button>
-            <button className="btn btn--danger" onClick={() => onDelete(ticket.id)}>
-              Delete
-            </button>
-          </div>
-        )}
+        <div className="ticket-card__actions">
+          {/* Toggle comments button — visible to everyone */}
+          <button
+            className="btn btn--ghost"
+            onClick={() => setShowComments((prev) => !prev)}
+          >
+            {showComments ? 'Hide Comments' : 'Comments'}
+          </button>
+
+          {/* Only render Edit/Delete if user has permission */}
+          {canModify && (
+            <>
+              <button className="btn btn--ghost" onClick={() => onEdit(ticket)}>
+                Edit
+              </button>
+              <button className="btn btn--danger" onClick={() => onDelete(ticket.id)}>
+                Delete
+              </button>
+            </>
+          )}
+        </div>
 
       </div>
+
+      {/* ── Comment Section ── */}
+      {/* Only renders when the user toggles it open */}
+      {showComments && (
+        <CommentSection ticketId={ticket.id} currentUser={currentUser} />
+      )}
+
     </div>
   );
 }

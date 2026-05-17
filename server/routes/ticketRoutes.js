@@ -79,5 +79,8 @@ router.put('/:id', protect, updateValidation, updateTicket);
 // DELETE TICKET
 router.delete('/:id', protect, deleteTicket);
 
+// Nest comment routes under tickets
+// e.g. GET /api/tickets/:id/comments
+router.use('/:id/comments', require('./commentRoutes'));
 
 module.exports = router;
