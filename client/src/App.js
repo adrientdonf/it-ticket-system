@@ -4,6 +4,7 @@ import TicketModal from './components/TicketModal';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
+import AdminPage from './pages/AdminPage';
 import { getTickets, createTicket, updateTicket, deleteTicket } from './services/api';
 import './App.css';
 
@@ -12,8 +13,6 @@ const FILTERS = ['all', 'open', 'in_progress', 'closed'];
 function App() {
 
   // ── Auth State ──────────────────────────────────────────────────────────────
-  // On first load, check localStorage for a saved user session.
-  // This keeps the user logged in even after a page refresh.
   const [currentUser, setCurrentUser] = useState(() => {
     const stored = localStorage.getItem('user');
     return stored ? JSON.parse(stored) : null;
@@ -29,12 +28,12 @@ function App() {
   const [search,        setSearch]        = useState('');
 
   // ── Navigation State ────────────────────────────────────────────────────────
-  // Controls which page is shown: dashboard, register, or profile
+  // Controls which page is shown
   const [showRegister, setShowRegister] = useState(false);
   const [showProfile,  setShowProfile]  = useState(false);
+  const [showAdmin,    setShowAdmin]    = useState(false);
 
   // ── Fetch Tickets ───────────────────────────────────────────────────────────
-  // Calls GET /api/tickets — the JWT token is attached automatically by api.js
   const fetchTickets = useCallback(async () => {
     try {
       setLoading(true);
@@ -48,17 +47,12 @@ function App() {
     }
   }, []);
 
-  // Re-fetch whenever the logged-in user changes (i.e. right after login)
   useEffect(() => {
     if (currentUser) fetchTickets();
   }, [currentUser, fetchTickets]);
 
   // ── Auth Handlers ───────────────────────────────────────────────────────────
-
-  // Called by LoginPage / RegisterPage after a successful auth response
-  const handleLogin = (user) => setCurrentUser(user);
-
-  // Clears token + user from localStorage and returns to login screen
+  const handleLogin  = (user) => setCurrentUser(user);
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -67,32 +61,18 @@ function App() {
   };
 
   // ── Ticket Handlers ─────────────────────────────────────────────────────────
-
-  // POST /api/tickets — create a new ticket then refresh the list
-  const handleCreate = async (form) => {
-    await createTicket(form);
-    fetchTickets();
-  };
-
-  // PUT /api/tickets/:id — update a ticket then refresh the list
-  const handleEdit = async (form) => {
-    await updateTicket(editingTicket.id, form);
-    fetchTickets();
-  };
-
-  // DELETE /api/tickets/:id — remove ticket from DB and instantly from UI
+  const handleCreate = async (form) => { await createTicket(form); fetchTickets(); };
+  const handleEdit   = async (form) => { await updateTicket(editingTicket.id, form); fetchTickets(); };
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this ticket?')) return;
     await deleteTicket(id);
     setTickets((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Open modal for creating (no pre-fill) or editing (pre-filled)
   const openCreate = () => { setEditingTicket(null); setModalOpen(true); };
   const openEdit   = (ticket) => { setEditingTicket(ticket); setModalOpen(true); };
 
   // ── Filter + Search ─────────────────────────────────────────────────────────
-  // Client-side filtering — no extra API call needed
   const filtered = tickets.filter((t) => {
     const matchStatus = filter === 'all' || t.status === filter;
     const matchSearch =
@@ -101,7 +81,6 @@ function App() {
     return matchStatus && matchSearch;
   });
 
-  // Count tickets per status for the filter pills
   const counts = {
     all:         tickets.length,
     open:        tickets.filter((t) => t.status === 'open').length,
@@ -114,34 +93,22 @@ function App() {
   };
 
   // ── Auth Guard ──────────────────────────────────────────────────────────────
-  // If no user is logged in, show login or register page
   if (!currentUser) {
     if (showRegister) {
-      return (
-        <RegisterPage
-          onLogin={handleLogin}
-          onGoToLogin={() => setShowRegister(false)}
-        />
-      );
+      return <RegisterPage onLogin={handleLogin} onGoToLogin={() => setShowRegister(false)} />;
     }
-    return (
-      <LoginPage
-        onLogin={handleLogin}
-        onGoToRegister={() => setShowRegister(true)}
-      />
-    );
+    return <LoginPage onLogin={handleLogin} onGoToRegister={() => setShowRegister(true)} />;
   }
 
   // ── Profile Page Guard ──────────────────────────────────────────────────────
-  // Show profile page when user clicks their username in the header
   if (showProfile) {
-    return (
-      <ProfilePage
-        currentUser={currentUser}
-        tickets={tickets}
-        onBack={() => setShowProfile(false)}
-      />
-    );
+    return <ProfilePage currentUser={currentUser} tickets={tickets} onBack={() => setShowProfile(false)} />;
+  }
+
+  // ── Admin Page Guard ────────────────────────────────────────────────────────
+  // Only admins can see this page — non-admins can't reach it from the UI anyway
+  if (showAdmin && currentUser.role === 'admin') {
+    return <AdminPage currentUser={currentUser} onBack={() => setShowAdmin(false)} />;
   }
 
   // ── Dashboard ───────────────────────────────────────────────────────────────
@@ -161,8 +128,13 @@ function App() {
             </div>
           </div>
 
-          {/* Right: username (clickable → profile), logout, new ticket */}
+          {/* Right: admin button (admins only), username, logout, new ticket */}
           <div className="header__right">
+            {currentUser.role === 'admin' && (
+              <button className="btn btn--ghost btn--sm" onClick={() => setShowAdmin(true)}>
+                🛡️ Admin
+              </button>
+            )}
             <span
               className="header__user"
               onClick={() => setShowProfile(true)}
@@ -232,9 +204,7 @@ function App() {
                 : 'No tickets yet. Create your first one!'}
             </p>
             {!search && filter === 'all' && (
-              <button className="btn btn--primary" onClick={openCreate}>
-                Create Ticket
-              </button>
+              <button className="btn btn--primary" onClick={openCreate}>Create Ticket</button>
             )}
           </div>
         )}

@@ -23,7 +23,9 @@ app.use('/api/auth', require('./routes/authRoutes'));
 // Ticket CRUD routes
 // GET, POST, PUT, DELETE /api/tickets
 app.use('/api/tickets', require('./routes/ticketRoutes'));
-
+// Admin routes (admin only)
+// GET, PUT, DELETE /api/admin/users
+app.use('/api/admin', require('./routes/adminRoutes'));
 // ── 404 Handler ──────────────────────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });
