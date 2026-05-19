@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { registerUser } from '../services/api';
-import './AuthPage.css';
 
 // ── RegisterPage ──────────────────────────────────────────────────────────────
-// Renders the registration form. On success, saves the JWT token and user
-// to localStorage, then calls onLogin() to take the user straight to the
-// dashboard — no need to log in again after registering.
+// Redesigned with the Stitch glassmorphism dark SaaS design system.
+// Mirrors the LoginPage layout: left branding panel + right form panel.
+// On success, saves JWT + user to localStorage and calls onLogin().
 // ─────────────────────────────────────────────────────────────────────────────
 
 function RegisterPage({ onLogin, onGoToLogin }) {
@@ -24,18 +23,17 @@ function RegisterPage({ onLogin, onGoToLogin }) {
     e.preventDefault();
     setError('');
 
-    // Client-side check: passwords must match before we even hit the API
+    // Client-side check: passwords must match before hitting the API
     if (password !== confirm) {
       setError('Passwords do not match.');
       return;
     }
 
     setLoading(true);
-
     try {
       const res = await registerUser({ username, email, password });
 
-      // Save token + user so the user is immediately logged in after registering
+      // Save token + user so the user is immediately logged in
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user',  JSON.stringify(res.data.user));
 
@@ -43,7 +41,6 @@ function RegisterPage({ onLogin, onGoToLogin }) {
       onLogin(res.data.user);
 
     } catch (err) {
-      // Show the server's error message (e.g. "Email already registered")
       setError(err.response?.data?.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
@@ -51,108 +48,217 @@ function RegisterPage({ onLogin, onGoToLogin }) {
   };
 
   return (
-    <div className="auth-page">
+    // ── Full-screen container: pure black background ──
+    <div className="min-h-screen w-full flex bg-black font-sans">
 
-      {/* ── Left panel: branding (same as login) ── */}
-      <div className="auth-panel auth-panel--left">
-        <div className="auth-brand">
-          <span className="auth-brand__icon">🎫</span>
-          <h1 className="auth-brand__name">TicketDesk</h1>
-          <p className="auth-brand__tagline">IT Support, simplified.</p>
+      {/* ── LEFT PANEL: Branding ───────────────────────────────────────────── */}
+      <div
+        className="hidden lg:flex flex-col justify-between w-1/2 p-12"
+        style={{ background: 'linear-gradient(135deg, #0a0a0a 0%, #0d1f2d 100%)' }}
+      >
+        {/* Logo + title */}
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ background: 'rgba(137,207,240,0.15)', border: '1px solid rgba(137,207,240,0.3)' }}
+          >
+            <span className="material-symbols-outlined text-primary text-xl">confirmation_number</span>
+          </div>
+          <span className="text-on-surface font-semibold text-lg tracking-wide">TicketDesk</span>
         </div>
 
-        {/* Decorative floating cards */}
-        <div className="auth-deco">
-          <div className="deco-card deco-card--1">
-            <span className="deco-badge deco-badge--high">High</span>
-            <p>Production server down</p>
+        {/* Center hero text */}
+        <div className="flex flex-col gap-6">
+          <h1
+            className="text-display-lg text-on-surface glow-accent leading-tight"
+            style={{ maxWidth: '420px' }}
+          >
+            Join your team's support hub.
+          </h1>
+          <p className="text-body-lg text-on-surface-variant" style={{ maxWidth: '360px' }}>
+            Create an account and start submitting, tracking, and resolving IT tickets — all in one place.
+          </p>
+
+          {/* Feature badges */}
+          <div className="flex gap-3 flex-wrap">
+            {[
+              { icon: 'bolt',   label: 'Fast' },
+              { icon: 'shield', label: 'Secure' },
+              { icon: 'group',  label: 'Team-ready' },
+            ].map(({ icon, label }) => (
+              <div
+                key={label}
+                className="flex items-center gap-2 px-4 py-2 rounded-full"
+                style={{ background: 'rgba(137,207,240,0.08)', border: '1px solid rgba(137,207,240,0.2)' }}
+              >
+                <span className="material-symbols-outlined text-primary text-sm">{icon}</span>
+                <span className="text-label-caps text-primary">{label}</span>
+              </div>
+            ))}
           </div>
-          <div className="deco-card deco-card--2">
-            <span className="deco-badge deco-badge--low">Low</span>
-            <p>Update office WiFi password</p>
-          </div>
-          <div className="deco-card deco-card--3">
-            <span className="deco-badge deco-badge--medium">Medium</span>
-            <p>Laptop keyboard not working</p>
-          </div>
+        </div>
+
+        {/* Decorative floating ticket cards */}
+        <div className="flex flex-col gap-3">
+          {[
+            { priority: 'High',   color: '#f87171', label: 'Production server down' },
+            { priority: 'Medium', color: '#fbbf24', label: 'Laptop keyboard not working' },
+            { priority: 'Low',    color: '#4ade80', label: 'Update office WiFi password' },
+          ].map(({ priority, color, label }) => (
+            <div
+              key={label}
+              className="glass-panel flex items-center gap-3 px-4 py-3 rounded-xl"
+              style={{ maxWidth: '300px' }}
+            >
+              <span
+                className="text-label-caps px-2 py-0.5 rounded-full font-bold"
+                style={{ background: `${color}22`, color }}
+              >
+                {priority}
+              </span>
+              <span className="text-body-sm text-on-surface-variant">{label}</span>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* ── Right panel: register form ── */}
-      <div className="auth-panel auth-panel--right">
-        <div className="auth-form-box">
+      {/* ── RIGHT PANEL: Register form ─────────────────────────────────────── */}
+      <div className="flex flex-1 items-center justify-center p-6 bg-black">
+        <div className="w-full" style={{ maxWidth: '440px' }}>
 
-          <div className="auth-form-header">
-            <h2>Create account</h2>
-            <p>Join TicketDesk to manage IT tickets</p>
+          {/* Header */}
+          <div className="mb-8">
+            <h2 className="text-headline-lg text-on-surface mb-2">Create account</h2>
+            <p className="text-body-lg text-on-surface-variant">
+              Join TicketDesk to manage IT tickets
+            </p>
           </div>
 
           {/* Error banner */}
           {error && (
-            <div className="auth-error">
-              ⚠️ {error}
+            <div
+              className="flex items-center gap-2 px-4 py-3 rounded-xl mb-6 text-body-sm"
+              style={{ background: 'rgba(255,75,75,0.1)', border: '1px solid rgba(255,75,75,0.3)', color: '#f87171' }}
+            >
+              <span className="material-symbols-outlined text-sm">error</span>
+              {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="auth-form">
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
 
-            {/* Username */}
-            <div className="auth-field">
-              <label htmlFor="username">Username</label>
-              <input
-                id="username"
-                type="text"
-                placeholder="e.g. adrien"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                autoFocus
-              />
+            {/* Username field */}
+            <div className="flex flex-col gap-2">
+              <label className="text-label-caps text-on-surface-variant">Username</label>
+              <div className="relative">
+                <span
+                  className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
+                  style={{ fontSize: '20px' }}
+                >
+                  person
+                </span>
+                <input
+                  type="text"
+                  placeholder="e.g. adrien"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  autoFocus
+                  className="input-glow w-full pl-11 pr-4 py-3 rounded-xl text-body-lg text-on-surface placeholder-on-surface-variant outline-none transition-all"
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                  }}
+                />
+              </div>
             </div>
 
-            {/* Email */}
-            <div className="auth-field">
-              <label htmlFor="email">Email</label>
-              <input
-                id="email"
-                type="email"
-                placeholder="you@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+            {/* Email field */}
+            <div className="flex flex-col gap-2">
+              <label className="text-label-caps text-on-surface-variant">Email</label>
+              <div className="relative">
+                <span
+                  className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
+                  style={{ fontSize: '20px' }}
+                >
+                  mail
+                </span>
+                <input
+                  type="email"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="input-glow w-full pl-11 pr-4 py-3 rounded-xl text-body-lg text-on-surface placeholder-on-surface-variant outline-none transition-all"
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                  }}
+                />
+              </div>
             </div>
 
-            {/* Password */}
-            <div className="auth-field">
-              <label htmlFor="password">Password</label>
-              <input
-                id="password"
-                type="password"
-                placeholder="Min. 6 characters"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+            {/* Password field */}
+            <div className="flex flex-col gap-2">
+              <label className="text-label-caps text-on-surface-variant">Password</label>
+              <div className="relative">
+                <span
+                  className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
+                  style={{ fontSize: '20px' }}
+                >
+                  lock
+                </span>
+                <input
+                  type="password"
+                  placeholder="Min. 6 characters"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="input-glow w-full pl-11 pr-4 py-3 rounded-xl text-body-lg text-on-surface placeholder-on-surface-variant outline-none transition-all"
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                  }}
+                />
+              </div>
             </div>
 
-            {/* Confirm password */}
-            <div className="auth-field">
-              <label htmlFor="confirm">Confirm Password</label>
-              <input
-                id="confirm"
-                type="password"
-                placeholder="Re-enter your password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                required
-              />
+            {/* Confirm password field */}
+            <div className="flex flex-col gap-2">
+              <label className="text-label-caps text-on-surface-variant">Confirm Password</label>
+              <div className="relative">
+                <span
+                  className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
+                  style={{ fontSize: '20px' }}
+                >
+                  lock_reset
+                </span>
+                <input
+                  type="password"
+                  placeholder="Re-enter your password"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  required
+                  className="input-glow w-full pl-11 pr-4 py-3 rounded-xl text-body-lg text-on-surface placeholder-on-surface-variant outline-none transition-all"
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                  }}
+                />
+              </div>
             </div>
 
+            {/* Submit button */}
             <button
               type="submit"
-              className="auth-btn"
               disabled={loading}
+              className="w-full py-3 rounded-xl text-title-md font-semibold transition-all mt-1"
+              style={{
+                background: loading ? 'rgba(137,207,240,0.5)' : '#89CFF0',
+                color: '#003546',
+                cursor: loading ? 'not-allowed' : 'pointer',
+              }}
             >
               {loading ? 'Creating account...' : 'Create Account →'}
             </button>
@@ -160,9 +266,12 @@ function RegisterPage({ onLogin, onGoToLogin }) {
           </form>
 
           {/* Switch to login */}
-          <p className="auth-switch">
+          <p className="text-body-sm text-on-surface-variant text-center mt-6">
             Already have an account?{' '}
-            <button className="auth-switch__link" onClick={onGoToLogin}>
+            <button
+              onClick={onGoToLogin}
+              className="text-primary font-semibold hover:underline transition-all"
+            >
               Sign in
             </button>
           </p>
