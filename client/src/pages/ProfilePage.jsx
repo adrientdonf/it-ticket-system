@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import api from '../services/api';
 
-function ProfilePage({ currentUser, tickets, onBack }) {
+function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword,     setNewPassword]     = useState('');
   const [confirm,         setConfirm]         = useState('');
@@ -15,17 +15,14 @@ function ProfilePage({ currentUser, tickets, onBack }) {
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    setError(''); setSuccess('');
     if (newPassword !== confirm) { setError('New passwords do not match.'); return; }
-    if (newPassword.length < 6)  { setError('New password must be at least 6 characters.'); return; }
+    if (newPassword.length < 6)  { setError('Password must be at least 6 characters.'); return; }
     setLoading(true);
     try {
       await api.put('/auth/change-password', { currentPassword, newPassword });
       setSuccess('Password updated successfully!');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirm('');
+      setCurrentPassword(''); setNewPassword(''); setConfirm('');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update password.');
     } finally {
@@ -33,228 +30,372 @@ function ProfilePage({ currentUser, tickets, onBack }) {
     }
   };
 
-  const priorityStyles = {
-    low:    { badge: 'bg-green-500/10 text-green-400 border border-green-500/20',  bar: 'bg-green-400' },
-    medium: { badge: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20', bar: 'bg-yellow-400' },
-    high:   { badge: 'bg-red-500/10 text-red-400 border border-red-500/20',       bar: 'bg-red-400' },
+  const priorityColor = {
+    low:    { color: '#4ade80', bg: 'rgba(74,222,128,0.1)',   border: 'rgba(74,222,128,0.25)',   bar: '#4ade80' },
+    medium: { color: '#fbbf24', bg: 'rgba(251,191,36,0.1)',   border: 'rgba(251,191,36,0.25)',   bar: '#fbbf24' },
+    high:   { color: '#f87171', bg: 'rgba(248,113,113,0.1)',  border: 'rgba(248,113,113,0.25)',  bar: '#f87171' },
   };
-  const statusStyles = {
-    open:        'bg-blue-500/10 text-blue-400 border border-blue-500/20',
-    in_progress: 'bg-purple-500/10 text-purple-400 border border-purple-500/20',
-    closed:      'bg-white/5 text-on-surface-variant border border-white/10',
+  const statusColor = {
+    open:        { color: '#89CFF0', bg: 'rgba(137,207,240,0.1)', border: 'rgba(137,207,240,0.25)' },
+    in_progress: { color: '#c084fc', bg: 'rgba(192,132,252,0.1)', border: 'rgba(192,132,252,0.25)' },
+    closed:      { color: '#899297', bg: 'rgba(137,146,151,0.1)', border: 'rgba(137,146,151,0.2)'  },
   };
 
   const openCount       = myTickets.filter(t => t.status === 'open').length;
   const inProgressCount = myTickets.filter(t => t.status === 'in_progress').length;
   const closedCount     = myTickets.filter(t => t.status === 'closed').length;
 
-  return (
-    <div className="space-y-gutter">
+  const glass = {
+    background: 'rgba(255,255,255,0.03)',
+    backdropFilter: 'blur(20px)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '16px',
+  };
 
-      {/* ── Page Header ── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <button
-            onClick={onBack}
-            className="flex items-center gap-xs text-on-surface-variant hover:text-primary transition-colors text-body-sm mb-sm"
-          >
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            Back to Dashboard
-          </button>
-          <h1 className="font-headline-lg text-headline-lg text-on-surface">My Profile</h1>
-          <p className="text-on-surface-variant text-body-sm">Manage your account and security settings</p>
+  const inputStyle = {
+    width: '100%',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '10px',
+    padding: '10px 14px',
+    color: '#e2e2e2',
+    fontSize: '14px',
+    outline: 'none',
+    fontFamily: "'Hanken Grotesk', sans-serif",
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+    boxSizing: 'border-box',
+  };
+
+  const labelStyle = {
+    color: '#899297',
+    fontSize: '11px',
+    fontWeight: 700,
+    letterSpacing: '0.07em',
+    textTransform: 'uppercase',
+    display: 'block',
+    marginBottom: '8px',
+  };
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: '#000000',
+      fontFamily: "'Hanken Grotesk', sans-serif",
+    }}>
+
+      {/* ── Top Header Bar ── */}
+      <header style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        height: '68px',
+        background: 'rgba(19,19,19,0.9)',
+        backdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(255,255,255,0.07)',
+        display: 'flex', alignItems: 'center',
+        padding: '0 40px',
+        gap: '16px',
+      }}>
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            width: '36px', height: '36px', borderRadius: '9px',
+            background: '#89CFF0',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <span className="material-symbols-outlined" style={{ color: '#003546', fontSize: '20px' }}>terminal</span>
+          </div>
+          <span style={{ fontSize: '18px', fontWeight: 700, color: '#bce8ff', letterSpacing: '-0.02em' }}>
+            TicketDesk
+          </span>
         </div>
-        <div className="flex items-center gap-sm px-md py-xs rounded-full border"
-          style={{ background: 'rgba(137,207,240,0.08)', borderColor: 'rgba(137,207,240,0.2)' }}>
-          <span className="text-primary text-body-sm font-bold uppercase tracking-wider">
+
+        {/* Divider */}
+        <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.08)' }} />
+
+        {/* Back button */}
+        <button
+          onClick={onBack}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '10px',
+            padding: '8px 16px',
+            color: '#bfc8cd',
+            fontSize: '13px', fontWeight: 600,
+            cursor: 'pointer',
+            fontFamily: "'Hanken Grotesk', sans-serif",
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(137,207,240,0.1)'; e.currentTarget.style.color = '#89CFF0'; e.currentTarget.style.borderColor = 'rgba(137,207,240,0.3)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = '#bfc8cd'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>arrow_back</span>
+          Back to Dashboard
+        </button>
+
+        {/* Right: page title + role badge */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '14px', fontWeight: 600, color: '#e2e2e2' }}>My Profile</span>
+          <span style={{
+            background: 'rgba(137,207,240,0.1)',
+            border: '1px solid rgba(137,207,240,0.25)',
+            borderRadius: '999px', padding: '3px 12px',
+            color: '#89CFF0', fontSize: '11px', fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: '0.08em',
+          }}>
             {currentUser.role}
           </span>
         </div>
-      </div>
+      </header>
 
-      {/* ── Top Row: Avatar Card + Account Details ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+      {/* ── Page Content ── */}
+      <div style={{
+        maxWidth: '1100px',
+        margin: '0 auto',
+        padding: '40px 40px 60px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '24px',
+      }}>
 
-        {/* Avatar Card */}
-        <div className="glass-card rounded-xl p-xl flex flex-col items-center justify-center text-center gap-md">
-          <div className="relative">
-            <div className="w-24 h-24 rounded-full flex items-center justify-center text-4xl font-bold text-on-primary"
-              style={{
+        {/* ── Row 1: Avatar + Account Details ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '24px' }}>
+
+          {/* Avatar Card */}
+          <div style={{ ...glass, padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textAlign: 'center' }}>
+            <div style={{ position: 'relative' }}>
+              <div style={{
+                width: '88px', height: '88px', borderRadius: '50%',
                 background: 'linear-gradient(135deg, #89CFF0, #005974)',
-                boxShadow: '0 0 30px rgba(137,207,240,0.3)',
+                boxShadow: '0 0 32px rgba(137,207,240,0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '36px', fontWeight: 700, color: '#003546',
               }}>
-              {currentUser.username.charAt(0).toUpperCase()}
-            </div>
-            <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center border-2 border-black"
-              style={{ background: '#89CFF0' }}>
-              <span className="material-symbols-outlined text-[14px] text-on-primary">edit</span>
-            </div>
-          </div>
-          <div>
-            <h2 className="font-title-md text-title-md text-primary">{currentUser.username}</h2>
-            <p className="text-on-surface-variant text-body-sm">{currentUser.email}</p>
-          </div>
-          {/* Stats Row */}
-          <div className="w-full grid grid-cols-3 gap-sm pt-md border-t border-white/10">
-            {[
-              { label: 'Open',        value: openCount,       color: 'text-blue-400' },
-              { label: 'In Progress', value: inProgressCount, color: 'text-purple-400' },
-              { label: 'Closed',      value: closedCount,     color: 'text-on-surface-variant' },
-            ].map(({ label, value, color }) => (
-              <div key={label} className="flex flex-col items-center gap-xs">
-                <span className={`font-bold text-title-md ${color}`}>{value}</span>
-                <span className="text-[10px] text-on-surface-variant uppercase tracking-wider leading-tight text-center">{label}</span>
+                {currentUser.username.charAt(0).toUpperCase()}
               </div>
-            ))}
+              <div style={{
+                position: 'absolute', bottom: '-2px', right: '-2px',
+                width: '26px', height: '26px', borderRadius: '50%',
+                background: '#89CFF0', border: '2px solid #000',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '13px', color: '#003546' }}>edit</span>
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: '#89CFF0' }}>{currentUser.username}</div>
+              <div style={{ fontSize: '13px', color: '#899297', marginTop: '4px' }}>{currentUser.email}</div>
+            </div>
+
+            {/* Stats */}
+            <div style={{
+              width: '100%',
+              display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
+              gap: '8px',
+              paddingTop: '20px',
+              borderTop: '1px solid rgba(255,255,255,0.07)',
+            }}>
+              {[
+                { label: 'Open',     value: openCount,       color: '#89CFF0' },
+                { label: 'In Prog',  value: inProgressCount, color: '#c084fc' },
+                { label: 'Closed',   value: closedCount,     color: '#899297' },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '20px', fontWeight: 700, color }}>{value}</span>
+                  <span style={{ fontSize: '10px', color: '#899297', textTransform: 'uppercase', letterSpacing: '0.06em', lineHeight: 1.2, textAlign: 'center' }}>{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Account Details */}
+          <div style={{ ...glass, padding: '32px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '28px' }}>
+              <span className="material-symbols-outlined" style={{ color: '#89CFF0', fontSize: '20px' }}>badge</span>
+              <span style={{ fontSize: '16px', fontWeight: 700, color: '#e2e2e2' }}>Account Details</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '28px' }}>
+              {[
+                { label: 'Username',      value: currentUser.username },
+                { label: 'Email Address', value: currentUser.email },
+                { label: 'Role',          value: currentUser.role },
+                { label: 'Total Tickets', value: `${myTickets.length} created` },
+              ].map(({ label, value }) => (
+                <div key={label}>
+                  <label style={labelStyle}>{label}</label>
+                  <div style={{
+                    fontSize: '15px', color: '#e2e2e2',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.07)',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    textTransform: label === 'Role' ? 'capitalize' : 'none',
+                  }}>
+                    {value}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Account Details */}
-        <div className="lg:col-span-2 glass-card rounded-xl p-xl">
-          <h3 className="font-title-md text-title-md text-primary mb-xl flex items-center gap-sm">
-            <span className="material-symbols-outlined">badge</span>
-            Account Details
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-xl">
-            {[
-              { label: 'Username',     value: currentUser.username },
-              { label: 'Email Address', value: currentUser.email },
-              { label: 'Role',          value: currentUser.role },
-              { label: 'Total Tickets', value: `${myTickets.length} created` },
-            ].map(({ label, value }) => (
-              <div key={label} className="space-y-xs">
-                <label className="text-label-caps font-label-caps text-on-surface-variant uppercase tracking-wider">
-                  {label}
-                </label>
-                <div className="text-body-lg text-on-surface capitalize">{value}</div>
+        {/* ── Row 2: My Tickets + Security ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px', alignItems: 'start' }}>
+
+          {/* My Tickets */}
+          <div style={{ ...glass, padding: '28px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span className="material-symbols-outlined" style={{ color: '#89CFF0', fontSize: '20px' }}>confirmation_number</span>
+                <span style={{ fontSize: '16px', fontWeight: 700, color: '#e2e2e2' }}>My Tickets</span>
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Bottom Row: My Tickets + Security Settings ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
-
-        {/* My Tickets */}
-        <div className="lg:col-span-2 glass-card rounded-xl p-xl flex flex-col">
-          <div className="flex justify-between items-center mb-xl">
-            <h3 className="font-headline-lg text-headline-lg text-on-surface">My Tickets</h3>
-            <span className="text-label-caps font-label-caps text-on-surface-variant">
-              {myTickets.length} TOTAL
-            </span>
-          </div>
-
-          {myTickets.length === 0 ? (
-            <div className="flex-grow flex flex-col items-center justify-center gap-md py-xl text-center">
-              <span className="material-symbols-outlined text-[48px] text-on-surface-variant">confirmation_number</span>
-              <p className="text-on-surface-variant text-body-sm">You haven't created any tickets yet.</p>
+              <span style={{ fontSize: '11px', color: '#899297', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                {myTickets.length} total
+              </span>
             </div>
-          ) : (
-            <div className="space-y-md flex-grow overflow-y-auto" style={{ maxHeight: '420px' }}>
-              {myTickets.map((ticket) => {
-                const ps = priorityStyles[ticket.priority] || priorityStyles.low;
-                const ss = statusStyles[ticket.status]    || statusStyles.closed;
-                return (
-                  <div key={ticket.id}
-                    className="flex gap-md p-md rounded-lg border border-white/5 hover:border-primary/20 transition-all"
-                    style={{ background: 'rgba(255,255,255,0.03)' }}>
-                    {/* Accent bar */}
-                    <div className={`w-[3px] rounded-full flex-shrink-0 ${ps.bar}`} />
-                    <div className="flex-grow space-y-xs">
-                      <div className="flex justify-between items-start">
-                        <span className="text-label-caps font-label-caps text-primary">#{ticket.id}</span>
-                        <div className="flex gap-xs">
-                          <span className={`px-sm py-xs rounded text-[10px] font-bold ${ps.badge}`}>
-                            {ticket.priority?.toUpperCase()}
+
+            {myTickets.length === 0 ? (
+              <div style={{ padding: '48px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '40px', color: '#899297', opacity: 0.4 }}>inbox</span>
+                <p style={{ color: '#899297', fontSize: '13px', margin: 0 }}>You haven't created any tickets yet.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '420px', overflowY: 'auto' }}>
+                {myTickets.map((ticket) => {
+                  const pc = priorityColor[ticket.priority] || priorityColor.low;
+                  const sc = statusColor[ticket.status]     || statusColor.closed;
+                  return (
+                    <div
+                      key={ticket.id}
+                      onClick={() => onSelectTicket && onSelectTicket(ticket)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '14px',
+                        padding: '14px 16px',
+                        borderRadius: '12px',
+                        background: 'rgba(255,255,255,0.02)',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        cursor: onSelectTicket ? 'pointer' : 'default',
+                        transition: 'all 0.18s',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = 'rgba(137,207,240,0.05)';
+                        e.currentTarget.style.borderColor = 'rgba(137,207,240,0.2)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                      }}
+                    >
+                      {/* Priority bar */}
+                      <div style={{ width: '3px', borderRadius: '999px', alignSelf: 'stretch', background: pc.bar, flexShrink: 0 }} />
+
+                      {/* Content */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                          <span style={{ fontSize: '11px', color: '#89CFF0', fontWeight: 700 }}>#{ticket.id}</span>
+                          <span style={{
+                            fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '999px',
+                            color: pc.color, background: pc.bg, border: `1px solid ${pc.border}`,
+                            textTransform: 'uppercase', letterSpacing: '0.05em',
+                          }}>
+                            {ticket.priority}
                           </span>
-                          <span className={`px-sm py-xs rounded text-[10px] font-bold ${ss}`}>
-                            {ticket.status?.replace('_', ' ').toUpperCase()}
+                          <span style={{
+                            fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '999px',
+                            color: sc.color, background: sc.bg, border: `1px solid ${sc.border}`,
+                            textTransform: 'uppercase', letterSpacing: '0.05em',
+                          }}>
+                            {ticket.status.replace('_', ' ')}
                           </span>
                         </div>
+                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#e2e2e2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {ticket.title}
+                        </div>
+                        {ticket.description && (
+                          <div style={{ fontSize: '12px', color: '#899297', marginTop: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {ticket.description}
+                          </div>
+                        )}
                       </div>
-                      <p className="font-title-md text-title-md text-on-surface">{ticket.title}</p>
-                      {ticket.description && (
-                        <p className="text-body-sm text-on-surface-variant line-clamp-1">{ticket.description}</p>
-                      )}
+
+                      {/* Arrow */}
+                      <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#899297', flexShrink: 0 }}>
+                        chevron_right
+                      </span>
                     </div>
-                    <div className="flex items-center flex-shrink-0">
-                      <span className="material-symbols-outlined text-on-surface-variant">chevron_right</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Security Settings */}
-        <div className="glass-card rounded-xl p-xl">
-          <h3 className="font-title-md text-title-md text-primary mb-xl flex items-center gap-sm">
-            <span className="material-symbols-outlined">lock</span>
-            Security Settings
-          </h3>
-
-          {success && (
-            <div className="mb-lg px-md py-sm rounded-lg text-body-sm font-bold flex items-center gap-sm"
-              style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#10b981' }}>
-              <span className="material-symbols-outlined text-[18px]">check_circle</span>
-              {success}
-            </div>
-          )}
-          {error && (
-            <div className="mb-lg px-md py-sm rounded-lg text-body-sm font-bold flex items-center gap-sm"
-              style={{ background: 'rgba(255,180,171,0.1)', border: '1px solid rgba(255,180,171,0.2)', color: '#ffb4ab' }}>
-              <span className="material-symbols-outlined text-[18px]">warning</span>
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handlePasswordChange} className="space-y-lg">
-            {[
-              { label: 'Current Password', value: currentPassword, setter: setCurrentPassword, placeholder: '••••••••' },
-              { label: 'New Password',     value: newPassword,     setter: setNewPassword,     placeholder: '••••••••' },
-              { label: 'Confirm Password', value: confirm,         setter: setConfirm,         placeholder: '••••••••' },
-            ].map(({ label, value, setter, placeholder }) => (
-              <div key={label} className="space-y-sm">
-                <label className="text-label-caps font-label-caps text-on-surface-variant uppercase">
-                  {label}
-                </label>
-                <input
-                  type="password"
-                  placeholder={placeholder}
-                  value={value}
-                  onChange={(e) => setter(e.target.value)}
-                  required
-                  className="w-full rounded-lg px-md py-sm text-on-surface text-body-lg focus:outline-none transition-all"
-                  style={{
-                    background: 'rgba(0,0,0,0.4)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                  }}
-                  onFocus={e => {
-                    e.target.style.borderColor = '#89CFF0';
-                    e.target.style.boxShadow = '0 0 15px rgba(137,207,240,0.2)';
-                  }}
-                  onBlur={e => {
-                    e.target.style.borderColor = 'rgba(255,255,255,0.1)';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                />
+                  );
+                })}
               </div>
-            ))}
+            )}
+          </div>
 
-            <div className="pt-md">
+          {/* Security Settings */}
+          <div style={{ ...glass, padding: '28px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
+              <span className="material-symbols-outlined" style={{ color: '#89CFF0', fontSize: '20px' }}>lock</span>
+              <span style={{ fontSize: '16px', fontWeight: 700, color: '#e2e2e2' }}>Security Settings</span>
+            </div>
+
+            {success && (
+              <div style={{ marginBottom: '16px', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)', color: '#4ade80' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>check_circle</span>
+                {success}
+              </div>
+            )}
+            {error && (
+              <div style={{ marginBottom: '16px', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', color: '#ffb4ab' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>warning</span>
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {[
+                { label: 'Current Password', value: currentPassword, setter: setCurrentPassword },
+                { label: 'New Password',     value: newPassword,     setter: setNewPassword     },
+                { label: 'Confirm Password', value: confirm,         setter: setConfirm         },
+              ].map(({ label, value, setter }) => (
+                <div key={label}>
+                  <label style={labelStyle}>{label}</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={value}
+                    onChange={e => setter(e.target.value)}
+                    required
+                    style={inputStyle}
+                    onFocus={e => { e.target.style.borderColor = '#89CFF0'; e.target.style.boxShadow = '0 0 14px rgba(137,207,240,0.15)'; }}
+                    onBlur={e  => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
+                  />
+                </div>
+              ))}
+
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full font-bold py-md rounded-lg transition-all border border-primary text-primary hover:bg-primary/10 disabled:opacity-50"
+                style={{
+                  marginTop: '8px',
+                  width: '100%', padding: '11px',
+                  borderRadius: '10px',
+                  background: 'transparent',
+                  border: '1px solid rgba(137,207,240,0.35)',
+                  color: '#89CFF0',
+                  fontSize: '13px', fontWeight: 700,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontFamily: "'Hanken Grotesk', sans-serif",
+                  opacity: loading ? 0.5 : 1,
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'rgba(137,207,240,0.08)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
               >
-                {loading ? 'Updating...' : 'Change Password'}
+                {loading ? 'Updating…' : 'Change Password'}
               </button>
-            </div>
-          </form>
-        </div>
+            </form>
+          </div>
 
+        </div>
       </div>
     </div>
   );

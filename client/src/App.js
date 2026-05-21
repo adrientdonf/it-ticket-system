@@ -30,24 +30,25 @@ function App() {
   const [selectedTicket, setSelectedTicket] = useState(null);
 
   // ── Navigation State ────────────────────────────────────────────────────────
-  const [showRegister,       setShowRegister]       = useState(false);
-  const [showProfile,        setShowProfile]        = useState(false);
-  const [showAdmin,          setShowAdmin]          = useState(false);
-  const [showNotifications,  setShowNotifications]  = useState(false);
+  const [showRegister,      setShowRegister]      = useState(false);
+  const [showProfile,       setShowProfile]       = useState(false);
+  const [showAdmin,         setShowAdmin]         = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [dismissedIds,      setDismissedIds]      = useState([]);
 
   // ── Fetch Tickets ───────────────────────────────────────────────────────────
-const fetchTickets = useCallback(async () => {
-  try {
-    setLoading(true);
-    setError(null);
-    const res = await getTickets();
-    setTickets(res.data.data || []);
-  } catch {
-    setError('Failed to load tickets. Is your backend running on port 8000?');
-  } finally {
-    setLoading(false);
-  }
-}, []);
+  const fetchTickets = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await getTickets();
+      setTickets(res.data.data || []);
+    } catch {
+      setError('Failed to load tickets. Is your backend running on port 8000?');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (currentUser) fetchTickets();
@@ -63,25 +64,46 @@ const fetchTickets = useCallback(async () => {
   };
 
   // ── Ticket Handlers ─────────────────────────────────────────────────────────
- const handleCreate = async (form) => { 
-  await createTicket(form); 
-  await fetchTickets(); 
-};
-
-const handleEdit = async (form) => { 
-  await updateTicket(editingTicket.id, form); 
-  await fetchTickets(); 
-};
-
-const handleDelete = async (id) => {
-  if (!window.confirm('Delete this ticket?')) return;
-  await deleteTicket(id);
-  await fetchTickets();
-  if (selectedTicket?.id === id) setSelectedTicket(null);
-};
+  const handleCreate = async (form) => { await createTicket(form); await fetchTickets(); };
+  const handleEdit   = async (form) => { await updateTicket(editingTicket.id, form); await fetchTickets(); };
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this ticket?')) return;
+    await deleteTicket(id);
+    await fetchTickets();
+    if (selectedTicket?.id === id) setSelectedTicket(null);
+  };
 
   const openCreate = () => { setEditingTicket(null); setModalOpen(true); };
   const openEdit   = (ticket) => { setEditingTicket(ticket); setModalOpen(true); };
+
+  // ── Notifications ───────────────────────────────────────────────────────────
+  // Generate real notifications from tickets data
+  const allNotifications = tickets
+    .slice()
+    .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
+    .slice(0, 8)
+    .map((t) => {
+      const isOwn = t.created_by?.toLowerCase() === currentUser?.username?.toLowerCase();
+      const date  = new Date(t.updated_at || t.created_at);
+      const now   = new Date();
+      const diff  = Math.floor((now - date) / 1000);
+      const time  =
+        diff < 60     ? 'just now' :
+        diff < 3600   ? `${Math.floor(diff / 60)}m ago` :
+        diff < 86400  ? `${Math.floor(diff / 3600)}h ago` :
+                        `${Math.floor(diff / 86400)}d ago`;
+
+      if (t.status === 'closed') {
+        return { id: t.id, icon: 'check_circle', text: `Ticket #${t.id} "${t.title}" was closed`, time, dot: false };
+      } else if (t.status === 'in_progress') {
+        return { id: t.id, icon: 'pending', text: `Ticket #${t.id} "${t.title}" is in progress`, time, dot: !isOwn };
+      } else {
+        return { id: t.id, icon: 'confirmation_number', text: `${isOwn ? 'You opened' : `${t.created_by} opened`} Ticket #${t.id} "${t.title}"`, time, dot: !isOwn };
+      }
+    })
+    .filter((n) => !dismissedIds.includes(n.id));
+
+  const unreadCount = allNotifications.filter((n) => n.dot).length;
 
   // ── Filter + Search ─────────────────────────────────────────────────────────
   const filtered = tickets.filter((t) => {
@@ -112,9 +134,15 @@ const handleDelete = async (id) => {
   }
 
   if (showProfile) {
-    return <ProfilePage currentUser={currentUser} tickets={tickets} onBack={() => setShowProfile(false)} />;
-  }
-
+  return (
+    <ProfilePage
+      currentUser={currentUser}
+      tickets={tickets}
+      onBack={() => setShowProfile(false)}
+      onSelectTicket={(ticket) => { setShowProfile(false); setSelectedTicket(ticket); }}
+    />
+  );
+}
   if (showAdmin && currentUser.role === 'admin') {
     return <AdminPage currentUser={currentUser} onBack={() => setShowAdmin(false)} />;
   }
@@ -200,69 +228,101 @@ const handleDelete = async (id) => {
               onMouseEnter={e => e.currentTarget.style.color = '#89CFF0'}
               onMouseLeave={e => e.currentTarget.style.color = '#bfc8cd'}
             >notifications</span>
-            <span style={{
-              position: 'absolute', top: '1px', right: '0px',
-              width: '7px', height: '7px', borderRadius: '50%',
-              background: '#89CFF0', border: '2px solid #000',
-              pointerEvents: 'none',
-            }} />
+
+            {/* Unread dot — only show if there are unread notifications */}
+            {unreadCount > 0 && (
+              <span style={{
+                position: 'absolute', top: '1px', right: '0px',
+                width: '7px', height: '7px', borderRadius: '50%',
+                background: '#89CFF0', border: '2px solid #000',
+                pointerEvents: 'none',
+              }} />
+            )}
 
             {/* Notifications Dropdown */}
             {showNotifications && (
               <div style={{
                 position: 'absolute', top: '36px', right: '-12px',
-                width: '300px', borderRadius: '12px', zIndex: 100,
+                width: '320px', borderRadius: '12px', zIndex: 100,
                 background: 'rgba(19,19,19,0.97)',
                 backdropFilter: 'blur(24px)',
                 border: '1px solid rgba(255,255,255,0.1)',
                 boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
                 overflow: 'hidden',
               }}>
+
                 {/* Header */}
                 <div style={{
                   padding: '14px 16px',
                   borderBottom: '1px solid rgba(255,255,255,0.07)',
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 }}>
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#e2e2e2', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                    Notifications
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#e2e2e2', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      Notifications
+                    </span>
+                    {unreadCount > 0 && (
+                      <span style={{
+                        fontSize: '10px', fontWeight: 700,
+                        background: 'rgba(137,207,240,0.15)',
+                        color: '#89CFF0',
+                        border: '1px solid rgba(137,207,240,0.3)',
+                        borderRadius: '999px', padding: '1px 6px',
+                      }}>{unreadCount}</span>
+                    )}
+                  </div>
                   <span
-  style={{ fontSize: '10px', color: '#89CFF0', fontWeight: 700, cursor: 'pointer' }}
-  onClick={(e) => { e.stopPropagation(); setShowNotifications(false); }}
->
-  DISMISS ALL
-</span>
+                    style={{ fontSize: '10px', color: '#89CFF0', fontWeight: 700, cursor: 'pointer' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDismissedIds(allNotifications.map(n => n.id));
+                      setShowNotifications(false);
+                    }}
+                  >
+                    DISMISS ALL
+                  </span>
                 </div>
 
                 {/* Items */}
-                {[
-                  { icon: 'confirmation_number', text: 'New ticket assigned to you',  time: '2m ago',  dot: true  },
-                  { icon: 'chat',                text: 'New comment on Ticket #42',    time: '15m ago', dot: true  },
-                  { icon: 'check_circle',        text: 'Ticket #38 marked as closed', time: '1h ago',  dot: false },
-                ].map(({ icon, text, time, dot }, i) => (
-                  <div key={i} style={{
-                    display: 'flex', alignItems: 'flex-start', gap: '12px',
-                    padding: '12px 16px',
-                    borderBottom: '1px solid rgba(255,255,255,0.05)',
-                    cursor: 'pointer', transition: 'background 0.15s',
-                  }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#89CFF0', flexShrink: 0, marginTop: '2px' }}>{icon}</span>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontSize: '13px', color: '#e2e2e2', lineHeight: 1.4 }}>{text}</p>
-                      <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#bfc8cd' }}>{time}</p>
-                    </div>
-                    {dot && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#89CFF0', flexShrink: 0, marginTop: '6px' }} />}
+                {allNotifications.length === 0 ? (
+                  <div style={{ padding: '24px 16px', textAlign: 'center', color: '#bfc8cd', fontSize: '13px' }}>
+                    No notifications
                   </div>
-                ))}
+                ) : (
+                  allNotifications.map((n) => (
+                    <div
+                      key={n.id}
+                      style={{
+                        display: 'flex', alignItems: 'flex-start', gap: '12px',
+                        padding: '12px 16px',
+                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                        cursor: 'pointer', transition: 'background 0.15s',
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const ticket = tickets.find(t => t.id === n.id);
+                        if (ticket) { setSelectedTicket(ticket); setShowNotifications(false); }
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#89CFF0', flexShrink: 0, marginTop: '2px' }}>{n.icon}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontSize: '13px', color: '#e2e2e2', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.text}</p>
+                        <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#bfc8cd' }}>{n.time}</p>
+                      </div>
+                      {n.dot && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#89CFF0', flexShrink: 0, marginTop: '6px' }} />}
+                    </div>
+                  ))
+                )}
 
                 {/* Footer */}
-                <div style={{ padding: '10px 16px', textAlign: 'center' }}>
-                  <span style={{ fontSize: '12px', color: '#89CFF0', cursor: 'pointer', fontWeight: 700 }}>
-                    VIEW ALL NOTIFICATIONS
+                <div style={{ padding: '10px 16px', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span
+                    style={{ fontSize: '12px', color: '#89CFF0', cursor: 'pointer', fontWeight: 700 }}
+                    onClick={(e) => { e.stopPropagation(); setShowNotifications(false); setFilter('all'); }}
+                  >
+                    VIEW ALL TICKETS
                   </span>
                 </div>
               </div>
@@ -662,7 +722,7 @@ const handleDelete = async (id) => {
 
                   {(currentUser.role === 'admin' || selectedTicket.created_by?.toLowerCase() === currentUser.username?.toLowerCase()) && (
                     <button
-                     onClick={() => handleDelete(selectedTicket.id)}
+                      onClick={() => handleDelete(selectedTicket.id)}
                       style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', borderRadius: '8px', fontSize: '14px', color: '#f87171', background: 'transparent', border: '1px solid rgba(248,113,113,0.2)', cursor: 'pointer', transition: 'background 0.2s' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'rgba(248,113,113,0.08)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
