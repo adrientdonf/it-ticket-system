@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
+const { register, login, getMe, changePassword, uploadAvatar } = require('../controllers/authController');
 
-const { register, login, getMe, changePassword } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 
 // ── REGISTER ──────────────────────────────────────────────────────────────────
@@ -41,4 +41,5 @@ router.get('/me', protect, getMe);
 // Requires a valid JWT token (protect middleware).
 router.put('/change-password', protect, changePassword);
 
+router.put('/avatar', protect, uploadAvatar);
 module.exports = router;

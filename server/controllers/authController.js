@@ -1,8 +1,10 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
+const cloudinary = require('../config/cloudinary');
+const { createUser, findUserByEmail, findUserById, updatePassword, updateAvatar } = require('../models/userModel');
 
-const { createUser, findUserByEmail, findUserById, updatePassword } = require('../models/userModel');
+
 // ── Generate JWT ──────────────────────────────────────────────────────────────
 // Creates a signed JWT token containing the user's id, username, and role.
 // Token expires in 7 days.
@@ -129,6 +131,28 @@ const changePassword = async (req, res) => {
     console.error('Change password error:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
+  
+};
+const uploadAvatar = async (req, res) => {
+  try {
+    const { imageData } = req.body;
+    if (!imageData) return res.status(400).json({ success: false, message: 'No image data provided.' });
+
+    // Upload base64 image to Cloudinary
+    const result = await cloudinary.uploader.upload(imageData, {
+      folder: 'ticketdesk/avatars',
+      transformation: [{ width: 200, height: 200, crop: 'fill', gravity: 'face' }],
+    });
+
+    // Save URL to DB
+    await updateAvatar(req.user.id, result.secure_url);
+
+    res.json({ success: true, avatarUrl: result.secure_url });
+  } catch (err) {
+    console.error('Avatar upload error:', err);
+    res.status(500).json({ success: false, message: 'Failed to upload avatar.' });
+  }
 };
 
-module.exports = { register, login, getMe, changePassword };
+
+module.exports = { register, login, getMe, changePassword, uploadAvatar };

@@ -40,10 +40,12 @@ const updatePassword = async (id, hashedPassword) => {
     [hashedPassword, id]
   );
 };
-
-module.exports = {
-  createUser,
-  findUserByEmail,
-  findUserById,
-  updatePassword,
+const updateAvatar = async (id, avatarUrl) => {
+  const [result] = await pool.query(
+    'UPDATE users SET avatar_url = ? WHERE id = ?',
+    [avatarUrl, id]
+  );
+  return result;
 };
+
+module.exports = { createUser, findUserByEmail, findUserById, updatePassword, updateAvatar };
