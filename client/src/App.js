@@ -348,15 +348,27 @@ function App() {
             onMouseEnter={e => e.currentTarget.style.opacity = '0.75'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
-            <div style={{
-              width: '36px', height: '36px', borderRadius: '50%',
-              background: 'linear-gradient(135deg, #89CFF0, #005974)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '13px', fontWeight: 700, color: '#003546',
-              border: '1px solid rgba(137,207,240,0.3)', flexShrink: 0,
-            }}>
-              {currentUser.username.charAt(0).toUpperCase()}
-            </div>
+            {currentUser.avatar_url ? (
+  <img
+    src={currentUser.avatar_url}
+    alt="avatar"
+    style={{
+      width: '36px', height: '36px', borderRadius: '50%',
+      objectFit: 'cover',
+      border: '1px solid rgba(137,207,240,0.3)', flexShrink: 0,
+    }}
+  />
+) : (
+  <div style={{
+    width: '36px', height: '36px', borderRadius: '50%',
+    background: 'linear-gradient(135deg, #89CFF0, #005974)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: '13px', fontWeight: 700, color: '#003546',
+    border: '1px solid rgba(137,207,240,0.3)', flexShrink: 0,
+  }}>
+    {currentUser.username.charAt(0).toUpperCase()}
+  </div>
+)}
             <div>
               <p style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#e2e2e2', lineHeight: 1.2 }}>
                 {currentUser.username}

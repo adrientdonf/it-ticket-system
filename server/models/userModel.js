@@ -41,7 +41,7 @@ const updatePassword = async (id, hashedPassword) => {
   );
 };
 const updateAvatar = async (id, avatarUrl) => {
-  const [result] = await pool.query(
+  const [result] = await db.execute(
     'UPDATE users SET avatar_url = ? WHERE id = ?',
     [avatarUrl, id]
   );

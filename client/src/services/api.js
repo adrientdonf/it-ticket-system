@@ -48,5 +48,5 @@ export const deleteTicket  = (id)       => api.delete(`/tickets/${id}`);
 export const getComments   = (ticketId)         => api.get(`/tickets/${ticketId}/comments`);
 export const addComment    = (ticketId, data)   => api.post(`/tickets/${ticketId}/comments`, data);
 export const deleteComment = (ticketId, commentId) => api.delete(`/tickets/${ticketId}/comments/${commentId}`);
-
+export const uploadAvatar = (imageData) => api.put('/auth/avatar', { imageData });
 export default api;
