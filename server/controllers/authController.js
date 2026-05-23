@@ -40,7 +40,7 @@ const register = async (req, res) => {
 
     const userId = await createUser({ username, email, password: hashedPassword, role });
 
-    const user = { id: userId, username, email, role: role || 'employee' };
+    const user = { id: userId, username, email, role: role || 'employee', avatar_url: null };
 
     return res.status(201).json({ success: true, token: generateToken(user), user });
 
@@ -74,7 +74,7 @@ const login = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    const safeUser = { id: user.id, username: user.username, email: user.email, role: user.role };
+    const safeUser = { id: user.id, username: user.username, email: user.email, role: user.role, avatar_url: user.avatar_url };
 
     return res.json({ success: true, token: generateToken(safeUser), user: safeUser });
 
