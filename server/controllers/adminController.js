@@ -79,5 +79,48 @@ const deleteUser = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+// ── GET RESET REQUESTS ────────────────────────────────────────────────────────
+// GET /api/admin/reset-requests
+// Returns all pending password reset requests.
+const getResetRequests = async (req, res) => {
+  try {
+    const [requests] = await db.execute(
+      `SELECT * FROM password_reset_requests WHERE status = 'pending' ORDER BY created_at DESC`
+    );
+    return res.json({ success: true, count: requests.length, data: requests });
+  } catch (err) {
+    console.error('Get reset requests error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
 
-module.exports = { getAllUsers, updateUserRole, deleteUser };
+// ── RESET USER PASSWORD ───────────────────────────────────────────────────────
+// PUT /api/admin/reset-requests/:id/resolve
+// Resets the user's password to temp1234 and marks request as resolved.
+const resolveResetRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const bcrypt = require('bcryptjs');
+
+    const [requests] = await db.execute(
+      `SELECT * FROM password_reset_requests WHERE id = ?`, [id]
+    );
+    if (requests.length === 0) {
+      return res.status(404).json({ success: false, message: 'Request not found.' });
+    }
+
+    const request = requests[0];
+    const salt = await bcrypt.genSalt(10);
+    const hashed = await bcrypt.hash('temp1234', salt);
+
+    await db.execute(`UPDATE users SET password = ? WHERE id = ?`, [hashed, request.user_id]);
+    await db.execute(`UPDATE password_reset_requests SET status = 'resolved' WHERE id = ?`, [id]);
+
+    return res.json({ success: true, message: 'Password reset to temp1234.' });
+  } catch (err) {
+    console.error('Resolve reset request error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+module.exports = { getAllUsers, updateUserRole, deleteUser, getResetRequests, resolveResetRequest };

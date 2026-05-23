@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { getResetRequests, resolveResetRequest } from '../services/api';
 
 function AdminPage({ currentUser, onBack }) {
-  const [users,   setUsers]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState('');
-  const [message, setMessage] = useState('');
-  const [search,  setSearch]  = useState('');
+  const [users,          setUsers]          = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [error,          setError]          = useState('');
+  const [message,        setMessage]        = useState('');
+  const [search,         setSearch]         = useState('');
+
+  // ── Reset request state ─────────────────────────────────────────────────────
+  const [resetRequests,  setResetRequests]  = useState([]);
+  const [showResets,     setShowResets]     = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -21,7 +26,20 @@ function AdminPage({ currentUser, onBack }) {
     }
   };
 
-  useEffect(() => { fetchUsers(); }, []);
+  // ── Fetch pending password reset requests ───────────────────────────────────
+  const fetchResetRequests = async () => {
+    try {
+      const res = await getResetRequests();
+      setResetRequests(res.data.data || []);
+    } catch (err) {
+      console.error('Failed to load reset requests:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+    fetchResetRequests();
+  }, []);
 
   const handleRoleChange = async (user) => {
     const newRole = user.role === 'admin' ? 'employee' : 'admin';
@@ -46,6 +64,21 @@ function AdminPage({ currentUser, onBack }) {
       setUsers((prev) => prev.filter((u) => u.id !== user.id));
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to delete user.');
+      setMessage('');
+    }
+  };
+
+  // ── Resolve a password reset request ────────────────────────────────────────
+  // Sets the user's password to temp1234 and marks the request as resolved
+  const handleResolveReset = async (request) => {
+    if (!window.confirm(`Reset ${request.username}'s password to temp1234?`)) return;
+    try {
+      await resolveResetRequest(request.id);
+      setMessage(`${request.username}'s password has been reset to temp1234.`);
+      setError('');
+      fetchResetRequests();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to reset password.');
       setMessage('');
     }
   };
@@ -80,10 +113,98 @@ function AdminPage({ currentUser, onBack }) {
           <h1 className="font-headline-lg text-headline-lg text-on-surface">User Management</h1>
           <p className="text-on-surface-variant text-body-sm">Manage system access levels and operational permissions.</p>
         </div>
-        <div className="flex items-center gap-sm px-md py-xs rounded-full border"
-          style={{ background: 'rgba(255,180,171,0.08)', borderColor: 'rgba(255,180,171,0.2)' }}>
-          <span className="material-symbols-outlined text-[16px] text-error">shield</span>
-          <span className="text-error text-body-sm font-bold uppercase tracking-wider">Admin Only</span>
+        <div className="flex items-center gap-sm">
+
+          {/* ── Reset Requests Bell ── */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowResets(!showResets)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                background: resetRequests.length > 0 ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${resetRequests.length > 0 ? 'rgba(251,191,36,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                borderRadius: '10px', padding: '8px 14px',
+                color: resetRequests.length > 0 ? '#fbbf24' : '#899297',
+                fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                fontFamily: "'Hanken Grotesk', sans-serif",
+                transition: 'all 0.2s',
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>lock_reset</span>
+              Reset Requests
+              {resetRequests.length > 0 && (
+                <span style={{
+                  background: '#fbbf24', color: '#000',
+                  borderRadius: '999px', fontSize: '11px', fontWeight: 800,
+                  padding: '1px 7px', marginLeft: '2px',
+                }}>
+                  {resetRequests.length}
+                </span>
+              )}
+            </button>
+
+            {/* ── Reset Requests Dropdown ── */}
+            {showResets && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                width: '340px', zIndex: 100,
+                background: '#1a1a1a',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '14px',
+                boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+                overflow: 'hidden',
+              }}>
+                <div style={{
+                  padding: '14px 18px',
+                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  fontSize: '13px', fontWeight: 700, color: '#e2e2e2',
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#fbbf24' }}>lock_reset</span>
+                  Pending Password Resets
+                </div>
+
+                {resetRequests.length === 0 ? (
+                  <div style={{ padding: '24px', textAlign: 'center', color: '#899297', fontSize: '13px' }}>
+                    No pending reset requests
+                  </div>
+                ) : (
+                  resetRequests.map((req) => (
+                    <div key={req.id} style={{
+                      padding: '14px 18px',
+                      borderBottom: '1px solid rgba(255,255,255,0.04)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+                    }}>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#e2e2e2' }}>{req.username}</div>
+                        <div style={{ fontSize: '11px', color: '#899297', marginTop: '2px' }}>{req.email}</div>
+                        <div style={{ fontSize: '10px', color: '#899297', marginTop: '2px' }}>{formatDate(req.created_at)}</div>
+                      </div>
+                      <button
+                        onClick={() => handleResolveReset(req)}
+                        style={{
+                          background: '#89CFF0', color: '#003546',
+                          border: 'none', borderRadius: '8px',
+                          padding: '6px 12px', fontSize: '12px', fontWeight: 700,
+                          cursor: 'pointer', whiteSpace: 'nowrap',
+                          fontFamily: "'Hanken Grotesk', sans-serif",
+                        }}
+                      >
+                        Reset Password
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Admin Only badge */}
+          <div className="flex items-center gap-sm px-md py-xs rounded-full border"
+            style={{ background: 'rgba(255,180,171,0.08)', borderColor: 'rgba(255,180,171,0.2)' }}>
+            <span className="material-symbols-outlined text-[16px] text-error">shield</span>
+            <span className="text-error text-body-sm font-bold uppercase tracking-wider">Admin Only</span>
+          </div>
         </div>
       </div>
 
@@ -106,9 +227,9 @@ function AdminPage({ currentUser, onBack }) {
       {/* ── Stats Row ── */}
       <div className="grid grid-cols-3 gap-gutter">
         {[
-          { label: 'Total Users', value: users.length,   icon: 'group',              color: 'text-primary' },
+          { label: 'Total Users', value: users.length,   icon: 'group',               color: 'text-primary' },
           { label: 'Admins',      value: adminCount,     icon: 'admin_panel_settings', color: 'text-yellow-400' },
-          { label: 'Employees',   value: employeeCount,  icon: 'badge',              color: 'text-blue-400' },
+          { label: 'Employees',   value: employeeCount,  icon: 'badge',               color: 'text-blue-400' },
         ].map(({ label, value, icon, color }) => (
           <div key={label} className="glass-card rounded-xl p-lg flex items-center gap-md">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -199,12 +320,8 @@ function AdminPage({ currentUser, onBack }) {
                           <div className="flex items-center gap-md">
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0"
                               style={{
-                                background: isSelf
-                                  ? 'rgba(137,207,240,0.15)'
-                                  : 'rgba(255,255,255,0.05)',
-                                border: isSelf
-                                  ? '1px solid rgba(137,207,240,0.3)'
-                                  : '1px solid rgba(255,255,255,0.08)',
+                                background: isSelf ? 'rgba(137,207,240,0.15)' : 'rgba(255,255,255,0.05)',
+                                border: isSelf ? '1px solid rgba(137,207,240,0.3)' : '1px solid rgba(255,255,255,0.08)',
                                 color: isSelf ? '#89CFF0' : '#bfc8cd',
                               }}>
                               {user.username.charAt(0).toUpperCase()}

@@ -1,13 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
-const { register, login, getMe, changePassword, uploadAvatar } = require('../controllers/authController');
+const { register, login, getMe, changePassword, uploadAvatar, forgotPassword } = require('../controllers/authController');
 
 const { protect } = require('../middleware/authMiddleware');
 
 // ── REGISTER ──────────────────────────────────────────────────────────────────
-// POST /api/auth/register
-// Creates a new user account. Validates input before hitting the controller.
 router.post(
   '/register',
   [
@@ -19,8 +17,6 @@ router.post(
 );
 
 // ── LOGIN ─────────────────────────────────────────────────────────────────────
-// POST /api/auth/login
-// Returns a JWT token on successful login.
 router.post(
   '/login',
   [
@@ -31,15 +27,17 @@ router.post(
 );
 
 // ── GET CURRENT USER ──────────────────────────────────────────────────────────
-// GET /api/auth/me
-// Returns the logged-in user's info. Requires a valid JWT token.
 router.get('/me', protect, getMe);
 
 // ── CHANGE PASSWORD ───────────────────────────────────────────────────────────
-// PUT /api/auth/change-password
-// Allows a logged-in user to update their password.
-// Requires a valid JWT token (protect middleware).
 router.put('/change-password', protect, changePassword);
 
+// ── AVATAR ────────────────────────────────────────────────────────────────────
 router.put('/avatar', protect, uploadAvatar);
+
+// ── FORGOT PASSWORD ───────────────────────────────────────────────────────────
+// POST /api/auth/forgot-password
+// Submits a password reset request (no login required)
+router.post('/forgot-password', forgotPassword);
+
 module.exports = router;

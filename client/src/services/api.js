@@ -33,20 +33,31 @@ api.interceptors.response.use(
 );
 
 // ── Auth Endpoints ────────────────────────────────────────────────────────────
-export const loginUser    = (data) => api.post('/auth/login', data);
-export const registerUser = (data) => api.post('/auth/register', data);
-export const getMe        = ()     => api.get('/auth/me');
+export const loginUser           = (data) => api.post('/auth/login', data);
+export const registerUser        = (data) => api.post('/auth/register', data);
+export const getMe               = ()     => api.get('/auth/me');
+export const forgotPassword      = (email) => api.post('/auth/forgot-password', { email });
 
 // ── Ticket Endpoints ──────────────────────────────────────────────────────────
-export const getTickets = () => api.get('/tickets');
-export const createTicket  = (data)     => api.post('/tickets', data);
-export const updateTicket  = (id, data) => api.put(`/tickets/${id}`, data);
-export const deleteTicket  = (id)       => api.delete(`/tickets/${id}`);
+export const getTickets    = ()           => api.get('/tickets');
+export const createTicket  = (data)       => api.post('/tickets', data);
+export const updateTicket  = (id, data)   => api.put(`/tickets/${id}`, data);
+export const deleteTicket  = (id)         => api.delete(`/tickets/${id}`);
 
 // ── Comment Endpoints ─────────────────────────────────────────────────────────
 // All comments are nested under a ticket ID.
-export const getComments   = (ticketId)         => api.get(`/tickets/${ticketId}/comments`);
-export const addComment    = (ticketId, data)   => api.post(`/tickets/${ticketId}/comments`, data);
+export const getComments   = (ticketId)            => api.get(`/tickets/${ticketId}/comments`);
+export const addComment    = (ticketId, data)      => api.post(`/tickets/${ticketId}/comments`, data);
 export const deleteComment = (ticketId, commentId) => api.delete(`/tickets/${ticketId}/comments/${commentId}`);
+
+// ── Avatar Endpoint ───────────────────────────────────────────────────────────
 export const uploadAvatar = (imageData) => api.put('/auth/avatar', { imageData });
+
+// ── Admin Endpoints ───────────────────────────────────────────────────────────
+export const getAllUsers          = ()          => api.get('/admin/users');
+export const updateUserRole      = (id, role)  => api.put(`/admin/users/${id}/role`, { role });
+export const deleteUser          = (id)        => api.delete(`/admin/users/${id}`);
+export const getResetRequests    = ()          => api.get('/admin/reset-requests');
+export const resolveResetRequest = (id)        => api.put(`/admin/reset-requests/${id}/resolve`);
+
 export default api;

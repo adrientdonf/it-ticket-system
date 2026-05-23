@@ -2,33 +2,65 @@
 // Uses prop-based navigation to match App.js (no React Router needed)
 import React, { useState } from 'react';
 import { loginUser } from '../services/api';
+import api from '../services/api';
 
 const LoginPage = ({ onLogin, onGoToRegister }) => {
-  const [email, setEmail]             = useState('');
-  const [password, setPassword]       = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember]       = useState(false);
-  const [loading, setLoading]         = useState(false);
-  const [error, setError]             = useState('');
+  const [email, setEmail]                   = useState('');
+  const [password, setPassword]             = useState('');
+  const [showPassword, setShowPassword]     = useState(false);
+  const [remember, setRemember]             = useState(false);
+  const [loading, setLoading]               = useState(false);
+  const [error, setError]                   = useState('');
 
- const handleSubmit = async (e) => {
-  e.preventDefault();
-  setLoading(true);
-  setError('');
-  try {
-    // Login returns both the token AND the user — no need for a second getMe() call
-    const res = await loginUser({ email, password });
-    localStorage.setItem('token', res.data.token);
-    localStorage.setItem('user', JSON.stringify(res.data.user));
+  // ── Forgot password modal state ─────────────────────────────────────────────
+  const [showForgot, setShowForgot]         = useState(false);
+  const [forgotEmail, setForgotEmail]       = useState('');
+  const [forgotLoading, setForgotLoading]   = useState(false);
+  const [forgotSuccess, setForgotSuccess]   = useState('');
+  const [forgotError, setForgotError]       = useState('');
 
-    // Tell App.js we're logged in
-    if (onLogin) onLogin(res.data.user);
-  } catch (err) {
-    setError('Invalid email or password. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-};
+  // ── Login handler ───────────────────────────────────────────────────────────
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      // Login returns both the token AND the user — no need for a second getMe() call
+      const res = await loginUser({ email, password });
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+      if (onLogin) onLogin(res.data.user);
+    } catch (err) {
+      setError('Invalid email or password. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Forgot password handler ─────────────────────────────────────────────────
+  // Submits a reset request to the backend — admin will be notified
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    setForgotError('');
+    setForgotSuccess('');
+    try {
+      await api.post('/auth/forgot-password', { email: forgotEmail });
+      setForgotSuccess('Reset request submitted! Please contact your IT admin.');
+    } catch (err) {
+      setForgotError(err.response?.data?.message || 'Something went wrong.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  // ── Close forgot modal and reset its state ──────────────────────────────────
+  const closeForgotModal = () => {
+    setShowForgot(false);
+    setForgotEmail('');
+    setForgotSuccess('');
+    setForgotError('');
+  };
 
   return (
     <main className="flex flex-col md:flex-row min-h-screen w-full">
@@ -124,9 +156,10 @@ const LoginPage = ({ onLogin, onGoToRegister }) => {
                 <label className="text-label-caps text-primary uppercase" htmlFor="password">
                   Secure Password
                 </label>
-                {/* Forgot password — button styled as link, no href="#" */}
+                {/* Forgot password — opens modal, does not submit the login form */}
                 <button
                   type="button"
+                  onClick={() => setShowForgot(true)}
                   className="text-body-sm text-on-surface-variant hover:text-primary transition-colors bg-transparent border-none p-0 cursor-pointer"
                 >
                   Forgot password?
@@ -182,7 +215,7 @@ const LoginPage = ({ onLogin, onGoToRegister }) => {
 
           </form>
 
-          {/* Register link — uses onGoToRegister prop from App.js */}
+          {/* Register link */}
           <div className="text-center pt-md">
             <p className="text-body-lg text-on-surface-variant">
               Don't have an account?{' '}
@@ -204,6 +237,94 @@ const LoginPage = ({ onLogin, onGoToRegister }) => {
 
         </div>
       </section>
+
+      {/* ── Forgot Password Modal ── */}
+      {showForgot && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 999,
+          background: 'rgba(0,0,0,0.7)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '24px',
+        }}>
+          <div style={{
+            background: '#131313',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '20px',
+            padding: '36px',
+            width: '100%',
+            maxWidth: '420px',
+            fontFamily: "'Hanken Grotesk', sans-serif",
+          }}>
+
+            {/* Modal header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h3 style={{ color: '#e2e2e2', fontSize: '18px', fontWeight: 700, margin: 0 }}>Forgot Password?</h3>
+              <button
+                onClick={closeForgotModal}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#899297' }}
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <p style={{ color: '#899297', fontSize: '13px', marginBottom: '24px' }}>
+              Enter your email and your IT admin will be notified to reset your password.
+            </p>
+
+            {/* Success state */}
+            {forgotSuccess ? (
+              <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)', color: '#4ade80', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>check_circle</span>
+                {forgotSuccess}
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+                {/* Error banner */}
+                {forgotError && (
+                  <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', color: '#ffb4ab', fontSize: '13px', fontWeight: 600 }}>
+                    {forgotError}
+                  </div>
+                )}
+
+                {/* Email input */}
+                <input
+                  type="email"
+                  placeholder="your@email.com"
+                  value={forgotEmail}
+                  onChange={e => setForgotEmail(e.target.value)}
+                  required
+                  style={{
+                    width: '100%', padding: '11px 14px', borderRadius: '10px',
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: '#e2e2e2', fontSize: '14px', outline: 'none',
+                    fontFamily: "'Hanken Grotesk', sans-serif",
+                    boxSizing: 'border-box',
+                  }}
+                />
+
+                {/* Submit button */}
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  style={{
+                    width: '100%', padding: '11px', borderRadius: '10px',
+                    background: '#89CFF0', color: '#003546',
+                    fontSize: '14px', fontWeight: 700, border: 'none',
+                    cursor: forgotLoading ? 'not-allowed' : 'pointer',
+                    opacity: forgotLoading ? 0.6 : 1,
+                    fontFamily: "'Hanken Grotesk', sans-serif",
+                  }}
+                >
+                  {forgotLoading ? 'Submitting...' : 'Submit Reset Request'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
     </main>
   );

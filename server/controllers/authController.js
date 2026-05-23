@@ -153,6 +153,44 @@ const uploadAvatar = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to upload avatar.' });
   }
 };
+// ── FORGOT PASSWORD ───────────────────────────────────────────────────────────
+// POST /api/auth/forgot-password
+// Submits a password reset request for an employee.
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
 
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required.' });
+    }
 
-module.exports = { register, login, getMe, changePassword, uploadAvatar };
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'No account found with that email.' });
+    }
+
+    // Check if there's already a pending request for this user
+    const db = require('../config/db');
+    const [existing] = await db.execute(
+      `SELECT * FROM password_reset_requests WHERE user_id = ? AND status = 'pending'`,
+      [user.id]
+    );
+
+    if (existing.length > 0) {
+      return res.status(400).json({ success: false, message: 'A reset request is already pending for this account.' });
+    }
+
+    await db.execute(
+      `INSERT INTO password_reset_requests (user_id, username, email) VALUES (?, ?, ?)`,
+      [user.id, user.username, email]
+    );
+
+    return res.json({ success: true, message: 'Reset request submitted. Please contact your IT admin.' });
+
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+module.exports = { register, login, getMe, changePassword, uploadAvatar, forgotPassword };
