@@ -26,10 +26,11 @@ const LoginPage = ({ onLogin, onGoToRegister }) => {
     setError('');
     try {
       // Login returns both the token AND the user — no need for a second getMe() call
-      const res = await loginUser({ email, password });
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('user', JSON.stringify(res.data.user));
-      if (onLogin) onLogin(res.data.user);
+     const res = await loginUser({ email, password });
+const storage = remember ? localStorage : sessionStorage;
+storage.setItem('token', res.data.token);
+storage.setItem('user', JSON.stringify(res.data.user));
+if (onLogin) onLogin(res.data.user);
     } catch (err) {
       setError('Invalid email or password. Please try again.');
     } finally {

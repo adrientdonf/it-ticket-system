@@ -14,10 +14,10 @@ const FILTERS = ['all', 'open', 'in_progress', 'closed'];
 function App() {
 
   // ── Auth State ──────────────────────────────────────────────────────────────
-  const [currentUser, setCurrentUser] = useState(() => {
-    const stored = localStorage.getItem('user');
-    return stored ? JSON.parse(stored) : null;
-  });
+const [currentUser, setCurrentUser] = useState(() => {
+  const stored = localStorage.getItem('user') || sessionStorage.getItem('user');
+  return stored ? JSON.parse(stored) : null;
+});
 
   // ── Ticket State ────────────────────────────────────────────────────────────
   const [tickets,        setTickets]        = useState([]);
@@ -57,11 +57,13 @@ function App() {
   // ── Auth Handlers ───────────────────────────────────────────────────────────
   const handleLogin  = (user) => setCurrentUser(user);
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setCurrentUser(null);
-    setTickets([]);
-  };
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  sessionStorage.removeItem('token');
+  sessionStorage.removeItem('user');
+  setCurrentUser(null);
+  setTickets([]);
+};
 
   // ── Ticket Handlers ─────────────────────────────────────────────────────────
   const handleCreate = async (form) => { await createTicket(form); await fetchTickets(); };
