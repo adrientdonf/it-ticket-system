@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 import CommentSection from './components/CommentSection';
 import { getTickets, createTicket, updateTicket, deleteTicket } from './services/api';
 import './App.css';
@@ -33,6 +34,7 @@ const [currentUser, setCurrentUser] = useState(() => {
   const [showRegister,      setShowRegister]      = useState(false);
   const [showProfile,       setShowProfile]       = useState(false);
   const [showAdmin,         setShowAdmin]         = useState(false);
+const [showAnalytics,     setShowAnalytics]     = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [dismissedIds,      setDismissedIds]      = useState([]);
 
@@ -145,9 +147,12 @@ const [currentUser, setCurrentUser] = useState(() => {
     />
   );
 }
-  if (showAdmin && currentUser.role === 'admin') {
-    return <AdminPage currentUser={currentUser} onBack={() => setShowAdmin(false)} />;
-  }
+ if (showAdmin && currentUser.role === 'admin') {
+  return <AdminPage currentUser={currentUser} onBack={() => setShowAdmin(false)} />;
+}
+if (showAnalytics && currentUser.role === 'admin') {
+  return <AnalyticsPage currentUser={currentUser} tickets={tickets} onBack={() => setShowAnalytics(false)} />;
+}
 
   // ── Dashboard ───────────────────────────────────────────────────────────────
   return (
@@ -430,22 +435,40 @@ const [currentUser, setCurrentUser] = useState(() => {
           </button>
 
           {/* Admin Panel — admins only */}
-          {currentUser.role === 'admin' && (
-            <button
-              onClick={() => setShowAdmin(true)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '12px',
-                padding: '12px 16px', borderRadius: '8px', width: '100%', textAlign: 'left',
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                color: '#bfc8cd', fontSize: '16px', transition: 'background 0.2s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
-              <span className="material-symbols-outlined">admin_panel_settings</span>
-              <span>Admin Panel</span>
-            </button>
-          )}
+{currentUser.role === 'admin' && (
+  <button
+    onClick={() => setShowAdmin(true)}
+    style={{
+      display: 'flex', alignItems: 'center', gap: '12px',
+      padding: '12px 16px', borderRadius: '8px', width: '100%', textAlign: 'left',
+      background: 'transparent', border: 'none', cursor: 'pointer',
+      color: '#bfc8cd', fontSize: '16px', transition: 'background 0.2s',
+    }}
+    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+  >
+    <span className="material-symbols-outlined">admin_panel_settings</span>
+    <span>Admin Panel</span>
+  </button>
+)}
+
+{/* Analytics — admins only */}
+{currentUser.role === 'admin' && (
+  <button
+    onClick={() => setShowAnalytics(true)}
+    style={{
+      display: 'flex', alignItems: 'center', gap: '12px',
+      padding: '12px 16px', borderRadius: '8px', width: '100%', textAlign: 'left',
+      background: 'transparent', border: 'none', cursor: 'pointer',
+      color: '#bfc8cd', fontSize: '16px', transition: 'background 0.2s',
+    }}
+    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+  >
+    <span className="material-symbols-outlined">analytics</span>
+    <span>Analytics</span>
+  </button>
+)}
         </nav>
 
         {/* Footer: Settings + Logout */}

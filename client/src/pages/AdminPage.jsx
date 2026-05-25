@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { getResetRequests, resolveResetRequest } from '../services/api';
+import { getResetRequests, resolveResetRequest, detectIncidents } from '../services/api';
 
 function AdminPage({ currentUser, onBack }) {
   const [users,         setUsers]         = useState([]);
@@ -10,6 +10,11 @@ function AdminPage({ currentUser, onBack }) {
   const [search,        setSearch]        = useState('');
   const [resetRequests, setResetRequests] = useState([]);
   const [showResets,    setShowResets]    = useState(false);
+
+  // ── AI Incident Detection state ──
+  const [incidents,      setIncidents]      = useState(null);   // null = not scanned yet
+  const [incidentSummary,setIncidentSummary]= useState('');
+  const [scanLoading,    setScanLoading]    = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -68,6 +73,28 @@ function AdminPage({ currentUser, onBack }) {
     }
   };
 
+  // ── AI Incident Detection handler ──
+  const handleDetectIncidents = async () => {
+    try {
+      setScanLoading(true);
+      const ticketsRes = await api.get('/tickets');
+      const openTickets = (ticketsRes.data.data || []).filter(t => t.status !== 'closed');
+      if (openTickets.length === 0) {
+        setIncidents([]);
+        setIncidentSummary('No open tickets to analyze.');
+        return;
+      }
+      const res = await detectIncidents({ tickets: openTickets });
+      setIncidents(res.data.data.incidents || []);
+      setIncidentSummary(res.data.data.summary || '');
+    } catch (err) {
+      setIncidents([]);
+      setIncidentSummary('Failed to run incident scan. Please try again.');
+    } finally {
+      setScanLoading(false);
+    }
+  };
+
   const formatDate = (iso) =>
     new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
@@ -83,6 +110,12 @@ function AdminPage({ currentUser, onBack }) {
     backdropFilter: 'blur(20px)',
     border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: '16px',
+  };
+
+  const severityConfig = {
+    critical: { color: '#ffb4ab', bg: 'rgba(255,180,171,0.08)', border: 'rgba(255,180,171,0.2)', icon: 'emergency' },
+    high:     { color: '#fbbf24', bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.2)',  icon: 'warning'   },
+    medium:   { color: '#60a5fa', bg: 'rgba(96,165,250,0.08)',  border: 'rgba(96,165,250,0.2)',  icon: 'info'      },
   };
 
   return (
@@ -255,6 +288,172 @@ function AdminPage({ currentUser, onBack }) {
           ))}
         </div>
 
+        {/* ── AI Incident Monitor ── */}
+        <div style={{ ...glass, overflow: 'hidden' }}>
+
+          {/* Header */}
+          <div style={{
+            padding: '20px 24px',
+            borderBottom: incidents !== null ? '1px solid rgba(255,255,255,0.05)' : 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '36px', height: '36px', borderRadius: '10px',
+                background: 'rgba(137,207,240,0.08)',
+                border: '1px solid rgba(137,207,240,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '20px', color: '#89CFF0' }}>monitor_heart</span>
+              </div>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: '#e2e2e2' }}>AI Incident Monitor</div>
+                <div style={{ fontSize: '12px', color: '#899297', marginTop: '2px' }}>
+                  Powered by Groq · llama-3.3-70b
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={handleDetectIncidents}
+              disabled={scanLoading}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                background: scanLoading ? 'rgba(137,207,240,0.05)' : 'rgba(137,207,240,0.1)',
+                border: '1px solid rgba(137,207,240,0.25)',
+                borderRadius: '10px', padding: '10px 18px',
+                color: scanLoading ? '#899297' : '#89CFF0',
+                fontSize: '13px', fontWeight: 700,
+                cursor: scanLoading ? 'not-allowed' : 'pointer',
+                fontFamily: "'Hanken Grotesk', sans-serif",
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => { if (!scanLoading) e.currentTarget.style.background = 'rgba(137,207,240,0.15)'; }}
+              onMouseLeave={e => { if (!scanLoading) e.currentTarget.style.background = 'rgba(137,207,240,0.1)'; }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+                {scanLoading ? 'hourglass_top' : incidents !== null ? 'refresh' : 'play_arrow'}
+              </span>
+              {scanLoading ? 'Scanning...' : incidents !== null ? 'Re-scan' : 'Run Scan'}
+            </button>
+          </div>
+
+          {/* Idle state */}
+          {incidents === null && !scanLoading && (
+            <div style={{ padding: '48px 24px', textAlign: 'center' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '40px', color: '#2a3a40', display: 'block', marginBottom: '12px' }}>
+                radar
+              </span>
+              <p style={{ margin: 0, fontSize: '14px', color: '#899297' }}>
+                Run a scan to detect potential incidents across open tickets.
+              </p>
+            </div>
+          )}
+
+          {/* Loading state */}
+          {scanLoading && (
+            <div style={{ padding: '48px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+              <div className="spinner" />
+              <p style={{ margin: 0, fontSize: '14px', color: '#899297' }}>Analyzing open tickets for incidents...</p>
+            </div>
+          )}
+
+          {/* Results */}
+          {incidents !== null && !scanLoading && (
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+              {/* Summary bar */}
+              {incidentSummary && (
+                <div style={{
+                  padding: '12px 16px', borderRadius: '10px',
+                  background: 'rgba(137,207,240,0.05)',
+                  border: '1px solid rgba(137,207,240,0.1)',
+                  fontSize: '13px', color: '#89CFF0',
+                  display: 'flex', alignItems: 'flex-start', gap: '8px',
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '18px', flexShrink: 0, marginTop: '1px' }}>analytics</span>
+                  {incidentSummary}
+                </div>
+              )}
+
+              {/* All clear */}
+              {incidents.length === 0 && (
+                <div style={{
+                  padding: '32px', textAlign: 'center',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '40px', color: '#10b981' }}>check_circle</span>
+                  <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#10b981' }}>All Clear</p>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#899297' }}>No incidents detected across open tickets.</p>
+                </div>
+              )}
+
+              {/* Incident cards */}
+              {incidents.length > 0 && incidents.map((incident, i) => {
+                const cfg = severityConfig[incident.severity] || severityConfig.medium;
+                return (
+                  <div key={i} style={{
+                    padding: '20px',
+                    borderRadius: '12px',
+                    background: cfg.bg,
+                    border: `1px solid ${cfg.border}`,
+                  }}>
+                    {/* Card header */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span className="material-symbols-outlined" style={{ color: cfg.color, fontSize: '22px' }}>{cfg.icon}</span>
+                        <span style={{ fontSize: '14px', fontWeight: 700, color: cfg.color }}>{incident.title}</span>
+                      </div>
+                      <span style={{
+                        fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em',
+                        padding: '3px 10px', borderRadius: '6px',
+                        background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color,
+                        flexShrink: 0,
+                      }}>
+                        {incident.severity}
+                      </span>
+                    </div>
+
+                    {/* Description */}
+                    <p style={{ margin: '0 0 12px', fontSize: '13px', color: '#bfc8cd', lineHeight: 1.6 }}>
+                      {incident.description}
+                    </p>
+
+                    {/* Affected tickets */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                      <span style={{ fontSize: '11px', color: '#899297', fontWeight: 600 }}>Affected tickets:</span>
+                      {incident.affectedTickets.map(id => (
+                        <span key={id} style={{
+                          fontSize: '11px', fontWeight: 700,
+                          padding: '2px 8px', borderRadius: '5px',
+                          background: 'rgba(255,255,255,0.05)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          color: '#e2e2e2',
+                        }}>
+                          #{id}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Recommended action */}
+                    <div style={{
+                      padding: '10px 14px', borderRadius: '8px',
+                      background: 'rgba(0,0,0,0.2)',
+                      border: '1px solid rgba(255,255,255,0.05)',
+                    }}>
+                      <div style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#899297', marginBottom: '4px' }}>
+                        Recommended Action
+                      </div>
+                      <div style={{ fontSize: '13px', color: '#bfc8cd', lineHeight: 1.5 }}>
+                        {incident.recommendedAction}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* ── User Directory Table ── */}
         <div style={{ ...glass, overflow: 'hidden' }}>
 
@@ -323,7 +522,6 @@ function AdminPage({ currentUser, onBack }) {
                           onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                         >
-                          {/* Username */}
                           <td style={{ padding: '16px 24px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                               <div style={{
@@ -349,11 +547,7 @@ function AdminPage({ currentUser, onBack }) {
                               </div>
                             </div>
                           </td>
-
-                          {/* Email */}
                           <td style={{ padding: '16px 24px', fontSize: '13px', color: '#899297' }}>{user.email}</td>
-
-                          {/* Role */}
                           <td style={{ padding: '16px 24px' }}>
                             <span style={{
                               fontSize: '10px', fontWeight: 700, padding: '3px 10px',
@@ -365,13 +559,9 @@ function AdminPage({ currentUser, onBack }) {
                               {user.role === 'admin' ? 'Admin' : 'Employee'}
                             </span>
                           </td>
-
-                          {/* Joined */}
                           <td style={{ padding: '16px 24px', fontSize: '13px', color: '#899297' }}>
                             {formatDate(user.created_at)}
                           </td>
-
-                          {/* Actions */}
                           <td style={{ padding: '16px 24px', textAlign: 'right' }}>
                             {isSelf ? (
                               <span style={{ color: '#899297', fontSize: '13px' }}>—</span>
@@ -414,7 +604,6 @@ function AdminPage({ currentUser, onBack }) {
             </div>
           )}
 
-          {/* Table Footer */}
           {!loading && (
             <div style={{
               padding: '14px 24px',
