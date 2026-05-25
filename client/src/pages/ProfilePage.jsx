@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import api from '../services/api';
-import { uploadAvatar } from '../services/api';
+import { uploadAvatar, changeUsername } from '../services/api';
 
-function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
+function ProfilePage({ currentUser, tickets, onBack, onSelectTicket, onUserUpdate }) {
 
   // ── Password form state ─────────────────────────────────────────────────────
   const [currentPassword, setCurrentPassword] = useState('');
@@ -12,10 +12,19 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
   const [success,         setSuccess]         = useState('');
   const [error,           setError]           = useState('');
 
+  // ── Username form state ─────────────────────────────────────────────────────
+  const [newUsername,       setNewUsername]       = useState('');
+  const [usernamePassword,  setUsernamePassword]  = useState('');
+  const [usernameLoading,   setUsernameLoading]   = useState(false);
+  const [usernameSuccess,   setUsernameSuccess]   = useState('');
+  const [usernameError,     setUsernameError]     = useState('');
+
   // ── Avatar state ────────────────────────────────────────────────────────────
-  // Initialise from currentUser.avatar_url (set after DB fetch) or null
   const [avatarUrl,     setAvatarUrl]     = useState(currentUser.avatar_url || null);
   const [avatarLoading, setAvatarLoading] = useState(false);
+
+  // ── Displayed username (updates instantly after successful change) ───────────
+  const [displayUsername, setDisplayUsername] = useState(currentUser.username);
 
   // ── Filter tickets belonging to this user ───────────────────────────────────
   const myTickets = tickets.filter(
@@ -40,22 +49,64 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
     }
   };
 
+  // ── Username change handler ─────────────────────────────────────────────────
+  const handleUsernameChange = async (e) => {
+    e.preventDefault();
+    setUsernameError(''); setUsernameSuccess('');
+
+    const trimmed = newUsername.trim();
+    if (!trimmed || !usernamePassword) {
+      setUsernameError('Both fields are required.'); return;
+    }
+    if (trimmed.length < 3 || trimmed.length > 30) {
+      setUsernameError('Username must be 3–30 characters.'); return;
+    }
+    if (/\s/.test(trimmed)) {
+      setUsernameError('Username cannot contain spaces.'); return;
+    }
+
+    setUsernameLoading(true);
+    try {
+      const res = await changeUsername(trimmed, usernamePassword);
+      const { token, user } = res.data;
+
+      // ── Persist new token + user to storage ──────────────────────────────────
+      // Keeps whichever storage the user chose at login (remember me = localStorage)
+      const storageKey = 'user';
+      const inLocal    = localStorage.getItem(storageKey);
+      const storage    = inLocal ? localStorage : sessionStorage;
+      storage.setItem('token', token);
+      storage.setItem(storageKey, JSON.stringify(user));
+
+      // ── Update axios default header so future requests use new token ─────────
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+      // ── Reflect new username immediately in the UI ───────────────────────────
+      setDisplayUsername(user.username);
+      setUsernameSuccess('Username updated successfully!');
+      setNewUsername(''); setUsernamePassword('');
+
+      // ── Bubble up to App.js so header/nav also updates ───────────────────────
+      if (onUserUpdate) onUserUpdate(user);
+
+    } catch (err) {
+      setUsernameError(err.response?.data?.message || 'Failed to update username.');
+    } finally {
+      setUsernameLoading(false);
+    }
+  };
+
   // ── Avatar upload handler ───────────────────────────────────────────────────
-  // Reads the selected file as base64, sends it to the backend,
-  // which uploads it to Cloudinary and saves the URL in the DB.
   const handleAvatarUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onloadend = async () => {
       try {
         setAvatarLoading(true);
         const res = await uploadAvatar(reader.result);
         const newUrl = res.data.avatarUrl;
-        // Update local state so avatar updates immediately
         setAvatarUrl(newUrl);
-        // Persist to localStorage so the header avatar updates too
         const stored = JSON.parse(localStorage.getItem('user'));
         localStorage.setItem('user', JSON.stringify({ ...stored, avatar_url: newUrl }));
       } catch (err) {
@@ -116,6 +167,12 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
     marginBottom: '8px',
   };
 
+  const sectionDivider = {
+    borderBottom: '1px solid rgba(255,255,255,0.07)',
+    marginBottom: '20px',
+    paddingBottom: '20px',
+  };
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -134,8 +191,6 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
         padding: '0 40px',
         gap: '16px',
       }}>
-
-        {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
             width: '36px', height: '36px', borderRadius: '9px',
@@ -148,11 +203,7 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
             TicketDesk
           </span>
         </div>
-
-        {/* Divider */}
         <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.08)' }} />
-
-        {/* Back button */}
         <button
           onClick={onBack}
           style={{
@@ -170,8 +221,6 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
           <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>arrow_back</span>
           Back to Dashboard
         </button>
-
-        {/* Right: page title + role badge */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '14px', fontWeight: 600, color: '#e2e2e2' }}>My Profile</span>
           <span style={{
@@ -197,11 +246,8 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
 
           {/* Avatar card */}
           <div style={{ ...glass, padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textAlign: 'center' }}>
-
-            {/* Avatar circle — shows photo if uploaded, otherwise initial letter */}
             <div style={{ position: 'relative' }}>
               {avatarUrl ? (
-                // ── Photo avatar ──
                 <img
                   src={avatarUrl}
                   alt="Profile"
@@ -213,7 +259,6 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
                   }}
                 />
               ) : (
-                // ── Initial letter fallback ──
                 <div style={{
                   width: '88px', height: '88px', borderRadius: '50%',
                   background: 'linear-gradient(135deg, #89CFF0, #005974)',
@@ -221,11 +266,9 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '36px', fontWeight: 700, color: '#003546',
                 }}>
-                  {currentUser.username.charAt(0).toUpperCase()}
+                  {displayUsername.charAt(0).toUpperCase()}
                 </div>
               )}
-
-              {/* Edit button — clicking triggers the hidden file input */}
               <label
                 htmlFor="avatar-upload"
                 title="Upload photo"
@@ -243,8 +286,6 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
                   {avatarLoading ? 'hourglass_empty' : 'edit'}
                 </span>
               </label>
-
-              {/* Hidden file input — only accepts images */}
               <input
                 id="avatar-upload"
                 type="file"
@@ -254,18 +295,16 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
               />
             </div>
 
-            {/* Username + email */}
+            {/* Uses displayUsername so it updates instantly after a username change */}
             <div>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: '#89CFF0' }}>{currentUser.username}</div>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: '#89CFF0' }}>{displayUsername}</div>
               <div style={{ fontSize: '13px', color: '#899297', marginTop: '4px' }}>{currentUser.email}</div>
             </div>
 
-            {/* Upload hint text */}
             <p style={{ fontSize: '11px', color: '#899297', margin: '-8px 0 0', lineHeight: 1.4 }}>
               Click the pencil icon to upload a photo
             </p>
 
-            {/* Ticket stats row */}
             <div style={{
               width: '100%', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
               gap: '8px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.07)',
@@ -291,7 +330,7 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '28px' }}>
               {[
-                { label: 'Username',      value: currentUser.username },
+                { label: 'Username',      value: displayUsername },
                 { label: 'Email Address', value: currentUser.email },
                 { label: 'Role',          value: currentUser.role },
                 { label: 'Total Tickets', value: `${myTickets.length} created` },
@@ -334,7 +373,6 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
                 <p style={{ color: '#899297', fontSize: '13px', margin: 0 }}>You haven't created any tickets yet.</p>
               </div>
             ) : (
-              // Scrollable ticket list — clicking a row navigates to that ticket in the dashboard
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '420px', overflowY: 'auto' }}>
                 {myTickets.map((ticket) => {
                   const pc = priorityColor[ticket.priority] || priorityColor.low;
@@ -354,10 +392,7 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
                       onMouseEnter={e => { e.currentTarget.style.background = 'rgba(137,207,240,0.05)'; e.currentTarget.style.borderColor = 'rgba(137,207,240,0.2)'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; }}
                     >
-                      {/* Priority accent bar */}
                       <div style={{ width: '3px', borderRadius: '999px', alignSelf: 'stretch', background: pc.bar, flexShrink: 0 }} />
-
-                      {/* Ticket info */}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                           <span style={{ fontSize: '11px', color: '#89CFF0', fontWeight: 700 }}>#{ticket.id}</span>
@@ -377,8 +412,6 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
                           </div>
                         )}
                       </div>
-
-                      {/* Chevron arrow */}
                       <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#899297', flexShrink: 0 }}>chevron_right</span>
                     </div>
                   );
@@ -387,70 +420,149 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket }) {
             )}
           </div>
 
-          {/* Security settings — change password form */}
+          {/* ── Security settings card ── */}
           <div style={{ ...glass, padding: '28px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
               <span className="material-symbols-outlined" style={{ color: '#89CFF0', fontSize: '20px' }}>lock</span>
               <span style={{ fontSize: '16px', fontWeight: 700, color: '#e2e2e2' }}>Security Settings</span>
             </div>
 
-            {/* Success banner */}
-            {success && (
-              <div style={{ marginBottom: '16px', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)', color: '#4ade80' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>check_circle</span>
-                {success}
+            {/* ── SECTION 1: Change Username ── */}
+            <div style={sectionDivider}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <span className="material-symbols-outlined" style={{ color: '#c084fc', fontSize: '16px' }}>manage_accounts</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  Change Username
+                </span>
               </div>
-            )}
 
-            {/* Error banner */}
-            {error && (
-              <div style={{ marginBottom: '16px', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', color: '#ffb4ab' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>warning</span>
-                {error}
-              </div>
-            )}
+              {/* Username success banner */}
+              {usernameSuccess && (
+                <div style={{ marginBottom: '14px', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)', color: '#4ade80' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>check_circle</span>
+                  {usernameSuccess}
+                </div>
+              )}
 
-            <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {[
-                { label: 'Current Password', value: currentPassword, setter: setCurrentPassword },
-                { label: 'New Password',     value: newPassword,     setter: setNewPassword     },
-                { label: 'Confirm Password', value: confirm,         setter: setConfirm         },
-              ].map(({ label, value, setter }) => (
-                <div key={label}>
-                  <label style={labelStyle}>{label}</label>
+              {/* Username error banner */}
+              {usernameError && (
+                <div style={{ marginBottom: '14px', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', color: '#ffb4ab' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>warning</span>
+                  {usernameError}
+                </div>
+              )}
+
+              <form onSubmit={handleUsernameChange} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label style={labelStyle}>New Username</label>
                   <input
-                    type="password"
-                    placeholder="••••••••"
-                    value={value}
-                    onChange={e => setter(e.target.value)}
-                    required
+                    type="text"
+                    placeholder={displayUsername}
+                    value={newUsername}
+                    onChange={e => setNewUsername(e.target.value)}
                     style={inputStyle}
-                    onFocus={e => { e.target.style.borderColor = '#89CFF0'; e.target.style.boxShadow = '0 0 14px rgba(137,207,240,0.15)'; }}
+                    onFocus={e => { e.target.style.borderColor = '#c084fc'; e.target.style.boxShadow = '0 0 14px rgba(192,132,252,0.15)'; }}
                     onBlur={e  => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
                   />
                 </div>
-              ))}
+                <div>
+                  <label style={labelStyle}>Confirm with Password</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={usernamePassword}
+                    onChange={e => setUsernamePassword(e.target.value)}
+                    style={inputStyle}
+                    onFocus={e => { e.target.style.borderColor = '#c084fc'; e.target.style.boxShadow = '0 0 14px rgba(192,132,252,0.15)'; }}
+                    onBlur={e  => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={usernameLoading}
+                  style={{
+                    width: '100%', padding: '11px',
+                    borderRadius: '10px', background: 'transparent',
+                    border: '1px solid rgba(192,132,252,0.35)',
+                    color: '#c084fc', fontSize: '13px', fontWeight: 700,
+                    cursor: usernameLoading ? 'not-allowed' : 'pointer',
+                    fontFamily: "'Hanken Grotesk', sans-serif",
+                    opacity: usernameLoading ? 0.5 : 1, transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={e => { if (!usernameLoading) e.currentTarget.style.background = 'rgba(192,132,252,0.08)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  {usernameLoading ? 'Updating…' : 'Change Username'}
+                </button>
+              </form>
+            </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                style={{
-                  marginTop: '8px', width: '100%', padding: '11px',
-                  borderRadius: '10px', background: 'transparent',
-                  border: '1px solid rgba(137,207,240,0.35)',
-                  color: '#89CFF0', fontSize: '13px', fontWeight: 700,
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  fontFamily: "'Hanken Grotesk', sans-serif",
-                  opacity: loading ? 0.5 : 1, transition: 'all 0.2s',
-                }}
-                onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'rgba(137,207,240,0.08)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-              >
-                {loading ? 'Updating…' : 'Change Password'}
-              </button>
-            </form>
+            {/* ── SECTION 2: Change Password ── */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <span className="material-symbols-outlined" style={{ color: '#89CFF0', fontSize: '16px' }}>key</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#89CFF0', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  Change Password
+                </span>
+              </div>
+
+              {/* Password success banner */}
+              {success && (
+                <div style={{ marginBottom: '14px', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)', color: '#4ade80' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>check_circle</span>
+                  {success}
+                </div>
+              )}
+
+              {/* Password error banner */}
+              {error && (
+                <div style={{ marginBottom: '14px', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', color: '#ffb4ab' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>warning</span>
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {[
+                  { label: 'Current Password', value: currentPassword, setter: setCurrentPassword },
+                  { label: 'New Password',     value: newPassword,     setter: setNewPassword     },
+                  { label: 'Confirm Password', value: confirm,         setter: setConfirm         },
+                ].map(({ label, value, setter }) => (
+                  <div key={label}>
+                    <label style={labelStyle}>{label}</label>
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      value={value}
+                      onChange={e => setter(e.target.value)}
+                      required
+                      style={inputStyle}
+                      onFocus={e => { e.target.style.borderColor = '#89CFF0'; e.target.style.boxShadow = '0 0 14px rgba(137,207,240,0.15)'; }}
+                      onBlur={e  => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
+                    />
+                  </div>
+                ))}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    width: '100%', padding: '11px',
+                    borderRadius: '10px', background: 'transparent',
+                    border: '1px solid rgba(137,207,240,0.35)',
+                    color: '#89CFF0', fontSize: '13px', fontWeight: 700,
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontFamily: "'Hanken Grotesk', sans-serif",
+                    opacity: loading ? 0.5 : 1, transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'rgba(137,207,240,0.08)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  {loading ? 'Updating…' : 'Change Password'}
+                </button>
+              </form>
+            </div>
+
           </div>
-
         </div>
       </div>
     </div>

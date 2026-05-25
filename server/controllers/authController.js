@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 const cloudinary = require('../config/cloudinary');
-const { createUser, findUserByEmail, findUserById, updatePassword, updateAvatar } = require('../models/userModel');
+const { createUser, findUserByEmail, findUserById, updatePassword, updateAvatar, findUserByUsername, updateUsername } = require('../models/userModel');
 
 
 // ── Generate JWT ──────────────────────────────────────────────────────────────
@@ -192,5 +192,64 @@ const forgotPassword = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+// ── CHANGE USERNAME ───────────────────────────────────────────────────────────
+// PUT /api/auth/change-username
+// Allows a logged-in user to change their username.
+// Requires current password confirmation for security.
+const changeUsername = async (req, res) => {
+  try {
+    const { newUsername, currentPassword } = req.body;
 
-module.exports = { register, login, getMe, changePassword, uploadAvatar, forgotPassword };
+    // ── Input validation ──────────────────────────────────────────────────────
+    if (!newUsername || !currentPassword) {
+      return res.status(400).json({ success: false, message: 'New username and current password are required.' });
+    }
+
+    const trimmed = newUsername.trim();
+
+    if (trimmed.length < 3 || trimmed.length > 30) {
+      return res.status(400).json({ success: false, message: 'Username must be between 3 and 30 characters.' });
+    }
+
+    if (/\s/.test(trimmed)) {
+      return res.status(400).json({ success: false, message: 'Username cannot contain spaces.' });
+    }
+
+    // ── Fetch user from DB (need hashed password) ─────────────────────────────
+    const user = await findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    // ── Verify current password before allowing change ────────────────────────
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Incorrect password. Username not changed.' });
+    }
+
+    // ── Block same-as-current username ────────────────────────────────────────
+    if (trimmed.toLowerCase() === user.username.toLowerCase()) {
+      return res.status(400).json({ success: false, message: 'New username must be different from your current one.' });
+    }
+
+    // ── Check uniqueness ──────────────────────────────────────────────────────
+    const existing = await findUserByUsername(trimmed);
+    if (existing) {
+      return res.status(409).json({ success: false, message: 'That username is already taken.' });
+    }
+
+    // ── Save + return a fresh token with updated username ─────────────────────
+    await updateUsername(req.user.id, trimmed);
+
+    const updatedUser = { id: user.id, username: trimmed, email: user.email, role: user.role, avatar_url: user.avatar_url };
+    const newToken = generateToken(updatedUser);
+
+    return res.json({ success: true, message: 'Username updated successfully.', token: newToken, user: updatedUser });
+
+  } catch (err) {
+    console.error('Change username error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+module.exports = { register, login, getMe, changePassword, uploadAvatar, forgotPassword, changeUsername };

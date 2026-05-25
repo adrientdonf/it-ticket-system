@@ -47,5 +47,22 @@ const updateAvatar = async (id, avatarUrl) => {
   );
   return result;
 };
+// ── Find User By Username ─────────────────────────────────────────────────────
+// Used to check if a username is already taken before allowing a change.
+const findUserByUsername = async (username) => {
+  const [rows] = await db.execute(
+    `SELECT id, username FROM users WHERE username = ?`,
+    [username]
+  );
+  return rows[0];
+};
 
-module.exports = { createUser, findUserByEmail, findUserById, updatePassword, updateAvatar };
+// ── Update Username ───────────────────────────────────────────────────────────
+// Updates the username for a user by their ID.
+const updateUsername = async (id, username) => {
+  await db.execute(
+    `UPDATE users SET username = ? WHERE id = ?`,
+    [username, id]
+  );
+};
+module.exports = { createUser, findUserByEmail, findUserById, updatePassword, updateAvatar, findUserByUsername, updateUsername };

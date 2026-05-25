@@ -65,4 +65,8 @@ export const resolveResetRequest = (id)        => api.put(`/admin/reset-requests
 export const summarizeTicket    = (data) => api.post('/ai/summarize', data);
 export const detectIncidents    = (data) => api.post('/ai/detect-incidents', data);
 
+
+export const changeUsername = (newUsername, currentPassword) =>
+  api.put('/auth/change-username', { newUsername, currentPassword });
+
 export default api;

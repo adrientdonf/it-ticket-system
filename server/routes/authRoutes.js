@@ -1,9 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
-const { register, login, getMe, changePassword, uploadAvatar, forgotPassword } = require('../controllers/authController');
+const { register, login, getMe, changePassword, uploadAvatar, forgotPassword, changeUsername } = require('../controllers/authController');
 
 const { protect } = require('../middleware/authMiddleware');
+
+const rateLimit = require('express-rate-limit');
+
+const usernameChangeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  message: { success: false, message: 'Too many attempts. Please wait 15 minutes and try again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ── REGISTER ──────────────────────────────────────────────────────────────────
 router.post(
@@ -34,6 +44,9 @@ router.put('/change-password', protect, changePassword);
 
 // ── AVATAR ────────────────────────────────────────────────────────────────────
 router.put('/avatar', protect, uploadAvatar);
+
+// ── CHANGE USERNAME ───────────────────────────────────────────────────────────
+router.put('/change-username', protect, usernameChangeLimiter, changeUsername);
 
 // ── FORGOT PASSWORD ───────────────────────────────────────────────────────────
 // POST /api/auth/forgot-password

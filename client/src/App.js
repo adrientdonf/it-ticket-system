@@ -137,13 +137,19 @@ const [showAnalytics,     setShowAnalytics]     = useState(false);
     return <LoginPage onLogin={handleLogin} onGoToRegister={() => setShowRegister(true)} />;
   }
 
-  if (showProfile) {
+ if (showProfile) {
   return (
     <ProfilePage
       currentUser={currentUser}
       tickets={tickets}
       onBack={() => setShowProfile(false)}
       onSelectTicket={(ticket) => { setShowProfile(false); setSelectedTicket(ticket); }}
+      onUserUpdate={(updatedUser) => {
+        setCurrentUser(updatedUser);
+        const inLocal = localStorage.getItem('user');
+        const storage = inLocal ? localStorage : sessionStorage;
+        storage.setItem('user', JSON.stringify(updatedUser));
+      }}
     />
   );
 }
@@ -327,7 +333,15 @@ if (showAnalytics && currentUser.role === 'admin') {
                 <div style={{ padding: '10px 16px', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                   <span
                     style={{ fontSize: '12px', color: '#89CFF0', cursor: 'pointer', fontWeight: 700 }}
-                    onClick={(e) => { e.stopPropagation(); setShowNotifications(false); setFilter('all'); }}
+                    onClick={(e) => { 
+  e.stopPropagation(); 
+  setShowNotifications(false); 
+  setFilter('all'); 
+  setSelectedTicket(null);
+  setShowProfile(false);
+  setShowAdmin(false);
+  setShowAnalytics(false);
+}}
                   >
                     VIEW ALL TICKETS
                   </span>
@@ -344,6 +358,7 @@ if (showAnalytics && currentUser.role === 'admin') {
             onMouseEnter={e => e.currentTarget.style.color = '#89CFF0'}
             onMouseLeave={e => e.currentTarget.style.color = '#bfc8cd'}
           >settings</span>
+          
 
           {/* Divider */}
           <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} />
