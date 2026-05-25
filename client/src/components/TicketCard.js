@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import CommentSection from './CommentSection';
+import { summarizeTicket } from '../services/api';
 
 // ── Config Maps ───────────────────────────────────────────────────────────────
 const PRIORITY_CONFIG = {
@@ -15,14 +16,17 @@ const STATUS_CONFIG = {
 };
 
 // ── TicketCard ────────────────────────────────────────────────────────────────
-// onSelect → clicking the title opens the expanded ticket view in App.js
-// ─────────────────────────────────────────────────────────────────────────────
-
 function TicketCard({ ticket, onEdit, onDelete, onSelect, currentUser }) {
   const priority = PRIORITY_CONFIG[ticket.priority] || PRIORITY_CONFIG.low;
   const status   = STATUS_CONFIG[ticket.status]     || STATUS_CONFIG.open;
 
   const [showComments, setShowComments] = useState(false);
+
+  // ── AI Summary state ────────────────────────────────────────────────────────
+  const [showAI,     setShowAI]     = useState(false);
+  const [aiData,     setAiData]     = useState(null);
+  const [aiLoading,  setAiLoading]  = useState(false);
+  const [aiError,    setAiError]    = useState('');
 
   const isAdmin   = currentUser?.role === 'admin';
   const isOwner   = ticket.created_by?.toLowerCase() === currentUser?.username?.toLowerCase();
@@ -32,6 +36,35 @@ function TicketCard({ ticket, onEdit, onDelete, onSelect, currentUser }) {
     new Date(iso).toLocaleDateString('en-US', {
       month: 'short', day: 'numeric', year: 'numeric',
     });
+
+  // ── AI Summary handler ──────────────────────────────────────────────────────
+  const handleAISummary = async () => {
+    if (showAI && aiData) { setShowAI(false); return; }
+    setShowAI(true);
+    if (aiData) return; // already fetched
+    setAiLoading(true);
+    setAiError('');
+    try {
+      const res = await summarizeTicket({
+        title:       ticket.title,
+        description: ticket.description,
+        priority:    ticket.priority,
+        status:      ticket.status,
+        comments:    [],
+      });
+      setAiData(res.data.data);
+    } catch (err) {
+      setAiError('Failed to generate AI summary.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const severityColor = {
+    critical: '#f87171',
+    high:     '#fbbf24',
+    medium:   '#c084fc',
+  };
 
   return (
     <div
@@ -69,7 +102,7 @@ function TicketCard({ ticket, onEdit, onDelete, onSelect, currentUser }) {
         </div>
       </div>
 
-      {/* ── Title + description — click title to open expanded view ── */}
+      {/* ── Title + description ── */}
       <div className="flex flex-col gap-1">
         <h3
           className="text-title-md font-semibold leading-snug transition-colors"
@@ -85,6 +118,73 @@ function TicketCard({ ticket, onEdit, onDelete, onSelect, currentUser }) {
         </p>
       </div>
 
+      {/* ── AI Summary Panel ── */}
+      {showAI && (
+        <div style={{
+          borderRadius: '10px',
+          background: 'rgba(137,207,240,0.04)',
+          border: '1px solid rgba(137,207,240,0.15)',
+          padding: '16px',
+          display: 'flex', flexDirection: 'column', gap: '12px',
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '16px', color: '#89CFF0' }}>auto_awesome</span>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#89CFF0', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              AI Analysis
+            </span>
+          </div>
+
+          {/* Loading */}
+          {aiLoading && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#899297', fontSize: '13px' }}>
+              <div className="spinner" style={{ width: '14px', height: '14px' }} />
+              Analyzing ticket...
+            </div>
+          )}
+
+          {/* Error */}
+          {aiError && (
+            <p style={{ color: '#f87171', fontSize: '13px', margin: 0 }}>{aiError}</p>
+          )}
+
+          {/* AI Data */}
+          {aiData && !aiLoading && (
+            <>
+              {/* Category + time badges */}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{
+                  fontSize: '10px', fontWeight: 700, padding: '2px 10px',
+                  borderRadius: '999px', background: 'rgba(137,207,240,0.1)',
+                  border: '1px solid rgba(137,207,240,0.2)', color: '#89CFF0',
+                }}>
+                  {aiData.category}
+                </span>
+                <span style={{
+                  fontSize: '10px', fontWeight: 700, padding: '2px 10px',
+                  borderRadius: '999px', background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)', color: '#899297',
+                }}>
+                  ⏱ {aiData.estimatedTime}
+                </span>
+              </div>
+
+              {/* Summary */}
+              <div>
+                <p style={{ fontSize: '10px', fontWeight: 700, color: '#899297', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 4px' }}>Summary</p>
+                <p style={{ fontSize: '13px', color: '#e2e2e2', margin: 0, lineHeight: 1.5 }}>{aiData.summary}</p>
+              </div>
+
+              {/* Suggested fix */}
+              <div>
+                <p style={{ fontSize: '10px', fontWeight: 700, color: '#899297', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 4px' }}>Suggested Fix</p>
+                <p style={{ fontSize: '13px', color: '#e2e2e2', margin: 0, lineHeight: 1.5 }}>{aiData.suggestedFix}</p>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* ── Footer: meta + actions ── */}
       <div
         className="flex items-center justify-between pt-3"
@@ -98,8 +198,36 @@ function TicketCard({ ticket, onEdit, onDelete, onSelect, currentUser }) {
           <span>{formatDate(ticket.created_at)}</span>
         </div>
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-2">
+       {/* Action buttons */}
+<div className="flex items-center gap-2" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+
+          {/* AI Summary button */}
+          <button
+            onClick={handleAISummary}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-body-sm transition-all"
+            style={{
+              color: showAI ? '#89CFF0' : '#bfc8cd',
+              background: showAI ? 'rgba(137,207,240,0.1)' : 'transparent',
+              border: `1px solid ${showAI ? 'rgba(137,207,240,0.3)' : 'rgba(255,255,255,0.08)'}`,
+            }}
+            onMouseEnter={e => {
+              if (!showAI) {
+                e.currentTarget.style.color = '#89CFF0';
+                e.currentTarget.style.borderColor = 'rgba(137,207,240,0.3)';
+                e.currentTarget.style.background = 'rgba(137,207,240,0.08)';
+              }
+            }}
+            onMouseLeave={e => {
+              if (!showAI) {
+                e.currentTarget.style.color = '#bfc8cd';
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+                e.currentTarget.style.background = 'transparent';
+              }
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>auto_awesome</span>
+            AI
+          </button>
 
           {/* Comments toggle */}
           <button
@@ -160,7 +288,7 @@ function TicketCard({ ticket, onEdit, onDelete, onSelect, currentUser }) {
         </div>
       </div>
 
-      {/* ── Comment Section (inline toggle) ── */}
+      {/* ── Comment Section ── */}
       {showComments && (
         <div className="pt-4 mt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <CommentSection ticketId={ticket.id} currentUser={currentUser} />

@@ -61,5 +61,8 @@ export const updateUserRole      = (id, role)  => api.put(`/admin/users/${id}/ro
 export const deleteUser          = (id)        => api.delete(`/admin/users/${id}`);
 export const getResetRequests    = ()          => api.get('/admin/reset-requests');
 export const resolveResetRequest = (id)        => api.put(`/admin/reset-requests/${id}/resolve`);
+// ── AI Endpoints ──────────────────────────────────────────────────────────────
+export const summarizeTicket    = (data) => api.post('/ai/summarize', data);
+export const detectIncidents    = (data) => api.post('/ai/detect-incidents', data);
 
 export default api;
