@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { uploadAvatar, changeUsername } from '../services/api';
 
@@ -25,6 +25,9 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket, onUserUpdat
 
   // ── Displayed username (updates instantly after successful change) ───────────
   const [displayUsername, setDisplayUsername] = useState(currentUser.username);
+
+  // ── Canvas ref for particle field ──────────────────────────────────────────
+  const canvasRef = useRef(null);
 
   // ── Filter tickets belonging to this user ───────────────────────────────────
   const myTickets = tickets.filter(
@@ -70,23 +73,18 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket, onUserUpdat
       const res = await changeUsername(trimmed, usernamePassword);
       const { token, user } = res.data;
 
-      // ── Persist new token + user to storage ──────────────────────────────────
-      // Keeps whichever storage the user chose at login (remember me = localStorage)
       const storageKey = 'user';
       const inLocal    = localStorage.getItem(storageKey);
       const storage    = inLocal ? localStorage : sessionStorage;
       storage.setItem('token', token);
       storage.setItem(storageKey, JSON.stringify(user));
 
-      // ── Update axios default header so future requests use new token ─────────
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
-      // ── Reflect new username immediately in the UI ───────────────────────────
       setDisplayUsername(user.username);
       setUsernameSuccess('Username updated successfully!');
       setNewUsername(''); setUsernamePassword('');
 
-      // ── Bubble up to App.js so header/nav also updates ───────────────────────
       if (onUserUpdate) onUserUpdate(user);
 
     } catch (err) {
@@ -117,6 +115,77 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket, onUserUpdat
     };
     reader.readAsDataURL(file);
   };
+
+  // ── Canvas particle field ───────────────────────────────────────────────────
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animId;
+
+    const resize = () => {
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Build particle pool
+    const COUNT = 90;
+    const particles = Array.from({ length: COUNT }, () => ({
+      x:    Math.random() * window.innerWidth,
+      y:    Math.random() * window.innerHeight,
+      r:    Math.random() * 1.4 + 0.3,
+      dx:   (Math.random() - 0.5) * 0.28,
+      dy:   (Math.random() - 0.5) * 0.28,
+      // each particle gets a hue: cyan (189) or violet (270)
+      hue:  Math.random() > 0.5 ? 189 : 270,
+      alpha: Math.random() * 0.45 + 0.1,
+    }));
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw faint connection lines
+      for (let i = 0; i < COUNT; i++) {
+        for (let j = i + 1; j < COUNT; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 110) {
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(137,207,240,${0.06 * (1 - dist / 110)})`;
+            ctx.lineWidth = 0.5;
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      particles.forEach(p => {
+        p.x += p.dx;
+        p.y += p.dy;
+        if (p.x < 0) p.x = canvas.width;
+        if (p.x > canvas.width)  p.x = 0;
+        if (p.y < 0) p.y = canvas.height;
+        if (p.y > canvas.height) p.y = 0;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${p.hue}, 85%, 75%, ${p.alpha})`;
+        ctx.fill();
+      });
+
+      animId = requestAnimationFrame(draw);
+    };
+    draw();
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
 
   // ── Priority + status color maps ────────────────────────────────────────────
   const priorityColor = {
@@ -178,25 +247,278 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket, onUserUpdat
       minHeight: '100vh',
       background: '#000000',
       fontFamily: "'Hanken Grotesk', sans-serif",
+      position: 'relative',
+      overflow: 'hidden',
     }}>
 
+      {/* ─────────────────────────────────────────────────────────────────────── */}
+      {/* ALL ANIMATION KEYFRAMES — injected once, touches nothing else           */}
+      {/* ─────────────────────────────────────────────────────────────────────── */}
+      <style>{`
+        /* 1. Floating particle canvas is drawn by JS — no keyframe needed */
+
+        /* 2. Radial glow orbs */
+        @keyframes orbDrift1 {
+          0%   { transform: translate(0px,   0px)   scale(1);    opacity: 0.18; }
+          33%  { transform: translate(60px,  -40px) scale(1.08); opacity: 0.26; }
+          66%  { transform: translate(-30px, 50px)  scale(0.94); opacity: 0.20; }
+          100% { transform: translate(0px,   0px)   scale(1);    opacity: 0.18; }
+        }
+        @keyframes orbDrift2 {
+          0%   { transform: translate(0px,  0px)   scale(1);    opacity: 0.14; }
+          40%  { transform: translate(-70px, 30px) scale(1.12); opacity: 0.22; }
+          75%  { transform: translate(50px, -60px) scale(0.9);  opacity: 0.16; }
+          100% { transform: translate(0px,  0px)   scale(1);    opacity: 0.14; }
+        }
+        @keyframes orbDrift3 {
+          0%   { transform: translate(0px,  0px)  scale(1);    opacity: 0.10; }
+          50%  { transform: translate(40px, 70px) scale(1.15); opacity: 0.18; }
+          100% { transform: translate(0px,  0px)  scale(1);    opacity: 0.10; }
+        }
+
+        /* 3. Floating decorative icons */
+        @keyframes iconFloat1 {
+          0%, 100% { transform: translateY(0px) rotate(-6deg); opacity: 0.10; }
+          50%      { transform: translateY(-22px) rotate(-2deg); opacity: 0.18; }
+        }
+        @keyframes iconFloat2 {
+          0%, 100% { transform: translateY(0px) rotate(8deg);  opacity: 0.08; }
+          50%      { transform: translateY(-16px) rotate(12deg); opacity: 0.15; }
+        }
+        @keyframes iconFloat3 {
+          0%, 100% { transform: translateY(0px) rotate(-4deg);  opacity: 0.07; }
+          50%      { transform: translateY(-28px) rotate(2deg);  opacity: 0.13; }
+        }
+        @keyframes iconFloat4 {
+          0%, 100% { transform: translateY(0px) rotate(6deg);   opacity: 0.09; }
+          50%      { transform: translateY(-18px) rotate(10deg); opacity: 0.16; }
+        }
+        @keyframes iconFloat5 {
+          0%, 100% { transform: translateY(0px) rotate(-10deg); opacity: 0.06; }
+          50%      { transform: translateY(-24px) rotate(-4deg); opacity: 0.12; }
+        }
+
+        /* 4. Scanline sweep */
+        @keyframes scanline {
+          0%   { top: -4px;   opacity: 0; }
+          5%   { opacity: 1; }
+          95%  { opacity: 1; }
+          100% { top: 100vh; opacity: 0; }
+        }
+
+        /* 5. Staggered entrance animations */
+        @keyframes slideInLeft {
+          from { opacity: 0; transform: translateX(-32px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes slideInRight {
+          from { opacity: 0; transform: translateX(32px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(24px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeDown {
+          from { opacity: 0; transform: translateY(-16px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* header entrance */
+        .profile-header-anim {
+          animation: fadeDown 0.55s cubic-bezier(0.22,1,0.36,1) both;
+        }
+        /* avatar card */
+        .profile-avatar-card-anim {
+          animation: slideInLeft 0.65s cubic-bezier(0.22,1,0.36,1) 0.12s both;
+        }
+        /* account details card */
+        .profile-account-card-anim {
+          animation: slideInRight 0.65s cubic-bezier(0.22,1,0.36,1) 0.20s both;
+        }
+        /* tickets list */
+        .profile-tickets-anim {
+          animation: slideInLeft 0.65s cubic-bezier(0.22,1,0.36,1) 0.30s both;
+        }
+        /* security card */
+        .profile-security-anim {
+          animation: slideInRight 0.65s cubic-bezier(0.22,1,0.36,1) 0.38s both;
+        }
+        /* form field stagger */
+        .profile-field-anim-1 { animation: fadeUp 0.45s cubic-bezier(0.22,1,0.36,1) 0.55s both; }
+        .profile-field-anim-2 { animation: fadeUp 0.45s cubic-bezier(0.22,1,0.36,1) 0.65s both; }
+        .profile-field-anim-3 { animation: fadeUp 0.45s cubic-bezier(0.22,1,0.36,1) 0.75s both; }
+        .profile-field-anim-4 { animation: fadeUp 0.45s cubic-bezier(0.22,1,0.36,1) 0.85s both; }
+        .profile-field-anim-5 { animation: fadeUp 0.45s cubic-bezier(0.22,1,0.36,1) 0.95s both; }
+
+        /* 6. Shimmer sweep on primary button */
+        @keyframes shimmerSweep {
+          0%   { background-position: -200% center; }
+          100% { background-position:  200% center; }
+        }
+        .profile-btn-shimmer {
+          position: relative;
+          overflow: hidden;
+        }
+        .profile-btn-shimmer::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: 10px;
+          background: linear-gradient(
+            105deg,
+            transparent 30%,
+            rgba(137,207,240,0.18) 50%,
+            transparent 70%
+          );
+          background-size: 200% 100%;
+          animation: shimmerSweep 2.4s linear infinite;
+          pointer-events: none;
+        }
+
+        .profile-btn-shimmer-violet::after {
+          background: linear-gradient(
+            105deg,
+            transparent 30%,
+            rgba(192,132,252,0.18) 50%,
+            transparent 70%
+          );
+          background-size: 200% 100%;
+          animation: shimmerSweep 2.4s linear infinite;
+        }
+
+        /* 7. Input glow on focus — already handled inline via onFocus/onBlur,
+              but we strengthen it with a CSS class for the animation pulse */
+        @keyframes inputGlowPulse {
+          0%, 100% { box-shadow: 0 0 10px rgba(137,207,240,0.15); }
+          50%      { box-shadow: 0 0 22px rgba(137,207,240,0.30); }
+        }
+        @keyframes inputGlowPulseViolet {
+          0%, 100% { box-shadow: 0 0 10px rgba(192,132,252,0.15); }
+          50%      { box-shadow: 0 0 22px rgba(192,132,252,0.30); }
+        }
+        .profile-input-focused-cyan:focus {
+          border-color: #89CFF0 !important;
+          animation: inputGlowPulse 1.8s ease-in-out infinite;
+        }
+        .profile-input-focused-violet:focus {
+          border-color: #c084fc !important;
+          animation: inputGlowPulseViolet 1.8s ease-in-out infinite;
+        }
+
+        /* 8. Logo breathing glow */
+        @keyframes logoBreath {
+          0%, 100% { box-shadow: 0 0 10px rgba(137,207,240,0.35), 0 0 22px rgba(137,207,240,0.12); }
+          50%      { box-shadow: 0 0 22px rgba(137,207,240,0.65), 0 0 44px rgba(137,207,240,0.25); }
+        }
+        .profile-logo-glow {
+          animation: logoBreath 3s ease-in-out infinite;
+        }
+      `}</style>
+
+      {/* ── 1. Canvas particle field (fixed, behind everything) ── */}
+      <canvas
+        ref={canvasRef}
+        style={{
+          position: 'fixed',
+          top: 0, left: 0,
+          width: '100%', height: '100%',
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
+
+      {/* ── 2. Radial glow orbs ── */}
+      {/* Orb 1 — cyan, top-left */}
+      <div style={{
+        position: 'fixed', top: '-180px', left: '-120px',
+        width: '600px', height: '600px',
+        borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(137,207,240,0.22) 0%, transparent 70%)',
+        animation: 'orbDrift1 18s ease-in-out infinite',
+        pointerEvents: 'none', zIndex: 0,
+      }} />
+      {/* Orb 2 — violet, bottom-right */}
+      <div style={{
+        position: 'fixed', bottom: '-200px', right: '-150px',
+        width: '700px', height: '700px',
+        borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(192,132,252,0.18) 0%, transparent 70%)',
+        animation: 'orbDrift2 24s ease-in-out infinite',
+        pointerEvents: 'none', zIndex: 0,
+      }} />
+      {/* Orb 3 — cyan, center-right, subtle */}
+      <div style={{
+        position: 'fixed', top: '35%', right: '-80px',
+        width: '420px', height: '420px',
+        borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(137,207,240,0.10) 0%, transparent 70%)',
+        animation: 'orbDrift3 30s ease-in-out infinite',
+        pointerEvents: 'none', zIndex: 0,
+      }} />
+
+      {/* ── 3. Floating decorative IT icons ── */}
+      {[
+        { icon: 'terminal',       top: '12%',  left: '4%',   size: '52px', anim: 'iconFloat1 9s  ease-in-out infinite' },
+        { icon: 'dns',            top: '68%',  left: '2%',   size: '44px', anim: 'iconFloat2 12s ease-in-out infinite 1.5s' },
+        { icon: 'lock',           top: '25%',  right: '3%',  size: '40px', anim: 'iconFloat3 11s ease-in-out infinite 0.8s' },
+        { icon: 'badge',          top: '78%',  right: '4%',  size: '48px', anim: 'iconFloat4 10s ease-in-out infinite 2.2s' },
+        { icon: 'manage_accounts',top: '50%',  left: '1.5%', size: '36px', anim: 'iconFloat5 14s ease-in-out infinite 0.4s' },
+      ].map(({ icon, top, left, right, size, anim }) => (
+        <span
+          key={icon}
+          className="material-symbols-outlined"
+          style={{
+            position: 'fixed',
+            top, left, right,
+            fontSize: size,
+            color: '#89CFF0',
+            pointerEvents: 'none',
+            zIndex: 0,
+            animation: anim,
+            userSelect: 'none',
+          }}
+        >
+          {icon}
+        </span>
+      ))}
+
+      {/* ── 4. Scanline sweep ── */}
+      <div style={{
+        position: 'fixed', left: 0, right: 0,
+        height: '3px',
+        background: 'linear-gradient(90deg, transparent, rgba(137,207,240,0.18), rgba(192,132,252,0.14), transparent)',
+        animation: 'scanline 8s linear infinite',
+        pointerEvents: 'none',
+        zIndex: 1,
+      }} />
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* ORIGINAL JSX — untouched except wrapper gets position:relative, z-index */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+
       {/* ── Sticky top header bar ── */}
-      <header style={{
-        position: 'sticky', top: 0, zIndex: 50,
-        height: '68px',
-        background: 'rgba(19,19,19,0.9)',
-        backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255,255,255,0.07)',
-        display: 'flex', alignItems: 'center',
-        padding: '0 40px',
-        gap: '16px',
-      }}>
+      <header
+        className="profile-header-anim"
+        style={{
+          position: 'sticky', top: 0, zIndex: 50,
+          height: '68px',
+          background: 'rgba(19,19,19,0.9)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
+          display: 'flex', alignItems: 'center',
+          padding: '0 40px',
+          gap: '16px',
+        }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '36px', height: '36px', borderRadius: '9px',
-            background: '#89CFF0',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+          {/* 8. Logo breathing glow — class added to the logo box */}
+          <div
+            className="profile-logo-glow"
+            style={{
+              width: '36px', height: '36px', borderRadius: '9px',
+              background: '#89CFF0',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
             <span className="material-symbols-outlined" style={{ color: '#003546', fontSize: '20px' }}>terminal</span>
           </div>
           <span style={{ fontSize: '18px', fontWeight: 700, color: '#bce8ff', letterSpacing: '-0.02em' }}>
@@ -239,13 +561,16 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket, onUserUpdat
         maxWidth: '1100px', margin: '0 auto',
         padding: '40px 40px 60px',
         display: 'flex', flexDirection: 'column', gap: '24px',
+        position: 'relative', zIndex: 2,
       }}>
 
         {/* ── Row 1: Avatar card + Account details ── */}
         <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '24px' }}>
 
-          {/* Avatar card */}
-          <div style={{ ...glass, padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textAlign: 'center' }}>
+          {/* Avatar card — 5. slideInLeft */}
+          <div
+            className="profile-avatar-card-anim"
+            style={{ ...glass, padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', textAlign: 'center' }}>
             <div style={{ position: 'relative' }}>
               {avatarUrl ? (
                 <img
@@ -295,7 +620,6 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket, onUserUpdat
               />
             </div>
 
-            {/* Uses displayUsername so it updates instantly after a username change */}
             <div>
               <div style={{ fontSize: '18px', fontWeight: 700, color: '#89CFF0' }}>{displayUsername}</div>
               <div style={{ fontSize: '13px', color: '#899297', marginTop: '4px' }}>{currentUser.email}</div>
@@ -322,8 +646,10 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket, onUserUpdat
             </div>
           </div>
 
-          {/* Account details card */}
-          <div style={{ ...glass, padding: '32px' }}>
+          {/* Account details card — 5. slideInRight */}
+          <div
+            className="profile-account-card-anim"
+            style={{ ...glass, padding: '32px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '28px' }}>
               <span className="material-symbols-outlined" style={{ color: '#89CFF0', fontSize: '20px' }}>badge</span>
               <span style={{ fontSize: '16px', fontWeight: 700, color: '#e2e2e2' }}>Account Details</span>
@@ -355,8 +681,10 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket, onUserUpdat
         {/* ── Row 2: My tickets + Security settings ── */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px', alignItems: 'start' }}>
 
-          {/* My tickets list */}
-          <div style={{ ...glass, padding: '28px' }}>
+          {/* My tickets list — 5. slideInLeft */}
+          <div
+            className="profile-tickets-anim"
+            style={{ ...glass, padding: '28px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span className="material-symbols-outlined" style={{ color: '#89CFF0', fontSize: '20px' }}>confirmation_number</span>
@@ -420,8 +748,10 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket, onUserUpdat
             )}
           </div>
 
-          {/* ── Security settings card ── */}
-          <div style={{ ...glass, padding: '28px' }}>
+          {/* ── Security settings card — 5. slideInRight ── */}
+          <div
+            className="profile-security-anim"
+            style={{ ...glass, padding: '28px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
               <span className="material-symbols-outlined" style={{ color: '#89CFF0', fontSize: '20px' }}>lock</span>
               <span style={{ fontSize: '16px', fontWeight: 700, color: '#e2e2e2' }}>Security Settings</span>
@@ -436,7 +766,6 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket, onUserUpdat
                 </span>
               </div>
 
-              {/* Username success banner */}
               {usernameSuccess && (
                 <div style={{ marginBottom: '14px', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)', color: '#4ade80' }}>
                   <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>check_circle</span>
@@ -444,7 +773,6 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket, onUserUpdat
                 </div>
               )}
 
-              {/* Username error banner */}
               {usernameError && (
                 <div style={{ marginBottom: '14px', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', color: '#ffb4ab' }}>
                   <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>warning</span>
@@ -452,34 +780,40 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket, onUserUpdat
                 </div>
               )}
 
+              {/* 5. Staggered field entrance */}
               <form onSubmit={handleUsernameChange} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div>
+                <div className="profile-field-anim-1">
                   <label style={labelStyle}>New Username</label>
+                  {/* 7. input glow class — violet */}
                   <input
                     type="text"
                     placeholder={displayUsername}
                     value={newUsername}
                     onChange={e => setNewUsername(e.target.value)}
+                    className="profile-input-focused-violet"
                     style={inputStyle}
                     onFocus={e => { e.target.style.borderColor = '#c084fc'; e.target.style.boxShadow = '0 0 14px rgba(192,132,252,0.15)'; }}
                     onBlur={e  => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
                   />
                 </div>
-                <div>
+                <div className="profile-field-anim-2">
                   <label style={labelStyle}>Confirm with Password</label>
                   <input
                     type="password"
                     placeholder="••••••••"
                     value={usernamePassword}
                     onChange={e => setUsernamePassword(e.target.value)}
+                    className="profile-input-focused-violet"
                     style={inputStyle}
                     onFocus={e => { e.target.style.borderColor = '#c084fc'; e.target.style.boxShadow = '0 0 14px rgba(192,132,252,0.15)'; }}
                     onBlur={e  => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
                   />
                 </div>
+                {/* 6. Shimmer button — violet variant */}
                 <button
                   type="submit"
                   disabled={usernameLoading}
+                  className="profile-btn-shimmer profile-btn-shimmer-violet"
                   style={{
                     width: '100%', padding: '11px',
                     borderRadius: '10px', background: 'transparent',
@@ -506,7 +840,6 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket, onUserUpdat
                 </span>
               </div>
 
-              {/* Password success banner */}
               {success && (
                 <div style={{ marginBottom: '14px', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)', color: '#4ade80' }}>
                   <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>check_circle</span>
@@ -514,7 +847,6 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket, onUserUpdat
                 </div>
               )}
 
-              {/* Password error banner */}
               {error && (
                 <div style={{ marginBottom: '14px', padding: '10px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,180,171,0.08)', border: '1px solid rgba(255,180,171,0.2)', color: '#ffb4ab' }}>
                   <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>warning</span>
@@ -524,27 +856,31 @@ function ProfilePage({ currentUser, tickets, onBack, onSelectTicket, onUserUpdat
 
               <form onSubmit={handlePasswordChange} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {[
-                  { label: 'Current Password', value: currentPassword, setter: setCurrentPassword },
-                  { label: 'New Password',     value: newPassword,     setter: setNewPassword     },
-                  { label: 'Confirm Password', value: confirm,         setter: setConfirm         },
-                ].map(({ label, value, setter }) => (
-                  <div key={label}>
+                  { label: 'Current Password', value: currentPassword, setter: setCurrentPassword, animClass: 'profile-field-anim-3' },
+                  { label: 'New Password',     value: newPassword,     setter: setNewPassword,     animClass: 'profile-field-anim-4' },
+                  { label: 'Confirm Password', value: confirm,         setter: setConfirm,         animClass: 'profile-field-anim-5' },
+                ].map(({ label, value, setter, animClass }) => (
+                  <div key={label} className={animClass}>
                     <label style={labelStyle}>{label}</label>
+                    {/* 7. input glow class — cyan */}
                     <input
                       type="password"
                       placeholder="••••••••"
                       value={value}
                       onChange={e => setter(e.target.value)}
                       required
+                      className="profile-input-focused-cyan"
                       style={inputStyle}
                       onFocus={e => { e.target.style.borderColor = '#89CFF0'; e.target.style.boxShadow = '0 0 14px rgba(137,207,240,0.15)'; }}
                       onBlur={e  => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.boxShadow = 'none'; }}
                     />
                   </div>
                 ))}
+                {/* 6. Shimmer button — cyan */}
                 <button
                   type="submit"
                   disabled={loading}
+                  className="profile-btn-shimmer"
                   style={{
                     width: '100%', padding: '11px',
                     borderRadius: '10px', background: 'transparent',
