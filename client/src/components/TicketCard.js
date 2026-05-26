@@ -60,11 +60,11 @@ function TicketCard({ ticket, onEdit, onDelete, onSelect, currentUser }) {
     }
   };
 
-  const severityColor = {
-    critical: '#f87171',
-    high:     '#fbbf24',
-    medium:   '#c084fc',
-  };
+  // const severityColor = {
+  //   critical: '#f87171',
+  //   high:     '#fbbf24',
+  //   medium:   '#c084fc',
+  // };
 
   return (
     <>
