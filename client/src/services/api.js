@@ -3,7 +3,7 @@ import axios from 'axios';
 // ── Base Axios Instance ───────────────────────────────────────────────────────
 // All API calls go through this instance so we only configure it once.
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api',
 });
 
 // ── Request Interceptor ───────────────────────────────────────────────────────
