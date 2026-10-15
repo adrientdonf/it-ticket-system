@@ -1,8 +1,16 @@
+cd ~/Desktop/PROJECTS/it-ticket-system
+cat > README.md << 'EOF'
 # TicketDesk
 
 A full-stack IT help desk ticketing system built with React, Node.js, Express, and MySQL. Supports role-based access control, real-time notifications, AI-powered ticket analysis, and a full admin panel — deployed on a zero-cost production stack.
 
-**[ticketdesk-kappa.vercel.app](https://ticketdesk-kappa.vercel.app)**
+**Live demo: [ticketdesk-kappa.vercel.app](https://ticketdesk-kappa.vercel.app)**
+
+> **Heads up:** the backend runs on a free tier that sleeps when idle, so the first login can take up to a minute. After that it's fast.
+>
+> **Try it:** log in as `admin@test.com` / `123456` (admin) or `adrien@test.com` / `123456` (employee).
+
+![TicketDesk screenshot](screenshot.png)
 
 ---
 
@@ -24,7 +32,7 @@ Two AI features run on top of the ticket data via Groq's API: a per-ticket summa
 | Authentication | JWT (with 30-day Remember Me) |
 | File Storage | Cloudinary |
 | AI | Groq API — llama-3.3-70b-versatile |
-| Hosting | Vercel, Render.com, Filess.io |
+| Hosting | Vercel, Render.com, Aiven |
 
 ---
 
@@ -44,7 +52,7 @@ Two AI features run on top of the ticket data via Groq's API: a per-ticket summa
 
 ## Getting Started
 
-Requires Node.js and a running MySQL instance.
+Requires Node.js and a running MySQL instance (local, or a hosted one such as Aiven).
 
 ```bash
 # Clone
@@ -52,10 +60,14 @@ git clone https://github.com/adrientdonf/it-ticket-system.git
 cd it-ticket-system
 
 # Backend
-cd server && npm install && node server.js
+cd server && npm install
+# create server/.env first (see Environment Variables below)
+node setup-db.js      # creates the four tables (safe to run more than once)
+node seed-users.js    # optional: adds the test accounts listed below
+node server.js
 # → http://localhost:8000
 
-# Frontend
+# Frontend (in a second terminal)
 cd client && npm install && npm start
 # → http://localhost:3000
 ```
@@ -80,7 +92,8 @@ it-ticket-system/
     models/             userModel.js
     routes/
     server.js
-    .env
+    setup-db.js         creates the database tables
+    seed-users.js       adds the demo accounts
 ```
 
 ---
@@ -135,16 +148,19 @@ password_reset_requests  id, user_id, username, email, status, created_at
 ```env
 PORT=8000
 DB_HOST=
+DB_PORT=3306
 DB_USER=
 DB_PASSWORD=
 DB_NAME=
-DB_PORT=3306
+DB_SSL=false
 JWT_SECRET=
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
 GROQ_API_KEY=
 ```
+
+Set `DB_SSL=true` for hosted databases that require an encrypted connection (Aiven does).
 
 `client/.env`:
 ```env
@@ -168,7 +184,9 @@ REACT_APP_API_URL=http://localhost:8000/api
 | Service | Provider |
 |---|---|
 | Frontend | Vercel |
-| Backend | Render.com (free tier — cold starts ~30s after inactivity) |
-| Database | Filess.io |
+| Backend | Render.com (free tier — cold starts of up to a minute after inactivity) |
+| Database | Aiven (free MySQL) |
 | Images | Cloudinary |
 | AI | Groq |
+EOF
+head -5 README.md
