@@ -1,5 +1,3 @@
-cd ~/Desktop/PROJECTS/it-ticket-system
-cat > README.md << 'EOF'
 # TicketDesk
 
 A full-stack IT help desk ticketing system built with React, Node.js, Express, and MySQL. Supports role-based access control, real-time notifications, AI-powered ticket analysis, and a full admin panel — deployed on a zero-cost production stack.
@@ -9,8 +7,6 @@ A full-stack IT help desk ticketing system built with React, Node.js, Express, a
 > **Heads up:** the backend runs on a free tier that sleeps when idle, so the first login can take up to a minute. After that it's fast.
 >
 > **Try it:** log in as `admin@test.com` / `123456` (admin) or `adrien@test.com` / `123456` (employee).
-
-![TicketDesk screenshot](screenshot.png)
 
 ---
 
@@ -188,5 +184,3 @@ REACT_APP_API_URL=http://localhost:8000/api
 | Database | Aiven (free MySQL) |
 | Images | Cloudinary |
 | AI | Groq |
-EOF
-head -5 README.md
